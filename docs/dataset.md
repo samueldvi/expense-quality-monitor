@@ -39,7 +39,7 @@ Questi file sono soltanto specificati in questa fase e non vengono ancora genera
 | 9 | `progetto` | Sì | Testo | Codice progetto sintetico, senza imporre una regex | `PRJ-2026-001` | nullo; vuoto; soli spazi |
 | 10 | `approvatore` | No | Testo | Nome fittizio o vuoto | `Serra Luca` | nullo, vuoto o soli spazi su una spesa sopra soglia |
 
-I valori nulli, vuoti o composti soltanto da spazi nei campi obbligatori saranno considerati mancanti. Date, importi, categorie e nomi saranno normalizzati prima del controllo dei duplicati logici.
+I valori nulli, vuoti o composti soltanto da spazi nei campi obbligatori saranno considerati mancanti. Date, importi, categorie e nomi saranno normalizzati soltanto per il controllo dei duplicati logici. La normalizzazione non modifica l'esito dei controlli di validità.
 
 ## 4. Dimensione e periodo
 
@@ -61,7 +61,7 @@ I soli valori validi di `categoria` saranno:
 - Rappresentanza;
 - Formazione.
 
-Valori diversi saranno presenti soltanto nei due scenari intenzionali di categoria non ammessa e saranno registrati nella ground truth.
+La validazione della categoria è stretta: sono validi soltanto questi sei valori esatti, con la stessa ortografia e lo stesso uso di maiuscole e minuscole e senza spazi aggiuntivi. La normalizzazione di spazi e maiuscole/minuscole è applicata esclusivamente per confrontare i duplicati logici e non rende valida una categoria non conforme. Valori diversi saranno presenti soltanto nei due scenari intenzionali di categoria non ammessa e saranno registrati nella ground truth.
 
 ## 6. Caratteristiche delle righe valide
 
@@ -102,9 +102,15 @@ Le quantità indicate contano le righe del CSV principale coinvolte. Le coppie s
 | Policy | Sopra soglia con approvatore | 2 righe | Produrre `richiede approvazione` senza non conformità |
 | Policy | Sopra soglia senza approvatore | 2 righe | Produrre anche `non conforme: supera soglia senza approvatore assegnato` |
 
-Le quattro righe di `Formazione` comprendono una spesa sopra soglia con approvatore e una sopra soglia senza approvatore. Queste due righe sono incluse rispettivamente nelle quantità dei due scenari di policy.
+Le quattro righe di `Formazione` comprendono esattamente una spesa sopra soglia con approvatore e una spesa sopra soglia senza approvatore. Le altre due righe di `Formazione` restano sotto o uguali alla soglia fissa. Le due spese sopra soglia sono incluse rispettivamente nelle quantità dei due scenari di policy.
 
-Per le cinque categorie statisticamente valutabili, distribuzioni e importi saranno costruiti affinché la mediana resti stabile e ciascuna delle cinque righe designate sia strettamente maggiore di tre volte la propria mediana. Le righe con importi mancanti, negativi o non numerici e quelle con categoria mancante o non ammessa non saranno usate per determinare i valori sintetici delle mediane.
+Per le cinque categorie statisticamente valutabili, distribuzioni e importi saranno costruiti affinché la mediana resti stabile e ciascuna delle cinque righe designate sia strettamente maggiore di tre volte la propria mediana. Tra queste cinque anomalie statistiche:
+
+- una supera anche la soglia di policy e ha `approvatore` valorizzato;
+- una supera anche la soglia di policy e ha `approvatore` assente;
+- le altre tre restano sotto o uguali alla soglia di policy della rispettiva categoria.
+
+In totale la ground truth conterrà esattamente 5 segnalazioni `STATISTICAL_AMOUNT_ANOMALY`, 4 segnalazioni `POLICY_APPROVAL_REQUIRED` e 2 segnalazioni `POLICY_MISSING_APPROVER`. Le righe con importi mancanti, negativi o non numerici e quelle con categoria mancante o non ammessa non saranno usate per determinare i valori sintetici delle mediane.
 
 ## 8. Sovrapposizione degli scenari
 
@@ -114,12 +120,14 @@ Sono previste soltanto queste sovrapposizioni intenzionali:
 |---|---|---|---|
 | Formazione sopra soglia con approvatore | Categoria non valutabile e policy | Verificare il fallback alla soglia fissa | `non valutabile statisticamente`; `richiede approvazione` |
 | Formazione sopra soglia senza approvatore | Categoria non valutabile e policy senza approvatore | Verificare insieme fallback e non conformità | `non valutabile statisticamente`; `richiede approvazione`; `non conforme: supera soglia senza approvatore assegnato` |
+| Anomalia statistica sopra soglia con approvatore | Anomalia statistica e policy | Verificare che le due classificazioni restino distinte | `anomalia statistica`; `richiede approvazione` |
+| Anomalia statistica sopra soglia senza approvatore | Anomalia statistica, policy e non conformità | Verificare le tre classificazioni sulla stessa riga | `anomalia statistica`; `richiede approvazione`; `non conforme: supera soglia senza approvatore assegnato` |
 | Ogni membro delle tre coppie con `id_spesa` ripetuto | Due righe condividono lo stesso identificativo | Verificare che l'intera coppia sia riconosciuta | duplicato per `id_spesa` ripetuto |
 | Ogni membro delle tre coppie logiche | Due righe descrivono la stessa spesa con identificativi diversi | Verificare il confronto normalizzato | duplicato logico |
 
-Una delle tre coppie logiche userà contemporaneamente spazi esterni e differenze di maiuscole/minuscole in dipendente e categoria, oltre a `,` e `.` come separatori decimali per lo stesso importo. Le altre due coppie useranno valori già uniformi.
+Una delle tre coppie logiche manterrà `categoria` identica e strettamente valida in entrambe le righe. Userà spazi esterni e differenze di maiuscole/minuscole soltanto in `dipendente`, oltre a `,` e `.` come separatori decimali per rappresentare lo stesso importo. Le altre due coppie useranno valori già uniformi.
 
-Le cinque anomalie statistiche delle categorie valutabili saranno mantenute distinte dai quattro scenari sopra soglia di policy. Gli altri errori intenzionali non si sovrapporranno. In questo modo ogni risultato resterà attribuibile a una regola precisa.
+Due delle cinque anomalie statistiche si sovrapporranno intenzionalmente agli scenari di policy come indicato nella tabella; le altre tre resteranno distinte dai controlli di policy. Gli altri errori intenzionali non si sovrapporranno. In questo modo ogni risultato resterà attribuibile a una regola precisa.
 
 Un campo obbligatorio mancante produrrà la sola segnalazione di completezza relativa a quel campo: le regole di validità saranno applicate ai valori presenti ma malformati. In particolare, un importo mancante non sarà contato anche come non numerico e una categoria mancante non sarà contata anche come non ammessa.
 
@@ -193,10 +201,12 @@ La futura generazione:
 5. Tutti gli scenari e tutte le quantità della matrice sono presenti, inclusa una riga con `id_spesa` non numerico.
 6. Ogni errore intenzionale corrisponde ad almeno una riga in `data/expected_anomalies.csv`.
 7. Ogni record della ground truth corrisponde a una segnalazione intenzionale presente nel CSV principale; le quattro righe di `Formazione` hanno ciascuna una segnalazione `STATISTICAL_NOT_EVALUABLE`.
-8. Almeno l'80% delle 300 righe non contiene errori intenzionali.
-9. Nomi, codici e contenuti sono interamente sintetici e non riconducibili a persone, aziende o clienti reali.
-10. Due generazioni con la stessa versione dello script producono file identici byte per byte.
-11. Entrambi i file sono CSV leggibili con strumenti standard.
+8. La ground truth contiene esattamente 5 segnalazioni `STATISTICAL_AMOUNT_ANOMALY`, 4 segnalazioni `POLICY_APPROVAL_REQUIRED` e 2 segnalazioni `POLICY_MISSING_APPROVER`.
+9. Soltanto i sei valori esatti comunicati dal richiedente superano la validazione della categoria.
+10. Almeno l'80% delle 300 righe non contiene errori intenzionali.
+11. Nomi, codici e contenuti sono interamente sintetici e non riconducibili a persone, aziende o clienti reali.
+12. Due generazioni con la stessa versione dello script producono file identici byte per byte.
+13. Entrambi i file sono CSV leggibili con strumenti standard.
 
 ## 12. Fuori ambito
 
