@@ -4,7 +4,7 @@ Progetto per ridurre il controllo manuale settimanale degli export CSV delle not
 
 ## Stato attuale
 
-I requisiti sono stati consolidati, il dataset sintetico è stato progettato, il generatore deterministico è stato implementato e il design della soluzione è stato completato. È stato creato lo scaffolding importabile del monolite modulare. Il motore di analisi, la dashboard completa e i test delle regole non sono ancora implementati.
+I requisiti sono stati consolidati, il dataset sintetico è stato progettato, il generatore deterministico è stato implementato e il design della soluzione è stato completato. Il monolite modulare include ora il motore deterministico e i relativi test unitari, di integrazione e di regressione. La dashboard completa non è ancora implementata.
 
 ## Dati
 
@@ -29,13 +29,37 @@ La generazione crea 300 righe usando il seed fisso `20260713` e una settimana si
 python3 -m pip install -e ".[dev]"
 ```
 
-## Avvio della shell
+## Analisi del dataset sintetico
+
+```python
+from expense_quality_monitor.pipeline import analyze_expenses
+
+result = analyze_expenses("data/synthetic_expenses.csv")
+print(result.summary)
+print(result.findings)
+```
+
+Il motore applica:
+
+- controlli di completezza sui campi obbligatori;
+- validità di identificativo, data, importo e categoria;
+- duplicati per identificativo e duplicati logici normalizzati;
+- valutabilità statistica e anomalie oltre tre volte la mediana;
+- soglie di policy, richieste di approvazione e non conformità.
+
+## Test
+
+```bash
+.venv/bin/python -m pytest -q
+```
+
+## Avvio della shell Streamlit
 
 ```bash
 streamlit run app.py
 ```
 
-La shell presenta soltanto il titolo e lo stato dell'integrazione. Non analizza ancora file CSV.
+La shell presenta soltanto il titolo e lo stato dell'integrazione. La dashboard completa non è ancora implementata.
 
 ## Struttura attuale
 
@@ -75,7 +99,11 @@ La shell presenta soltanto il titolo e lo stato dell'integrazione. Non analizza 
 │           └── validity.py
 └── tests
     ├── __init__.py
-    └── test_package_import.py
+    ├── test_loader.py
+    ├── test_package_import.py
+    ├── test_pipeline_reporting.py
+    ├── test_regression.py
+    └── test_rules.py
 ```
 
 ## Convenzione dei commit
