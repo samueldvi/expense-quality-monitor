@@ -1,0 +1,12 @@
+# Assunzioni
+
+Le risposte di Nicola hanno chiuso le domande principali. Le seguenti assunzioni operative restano necessarie per rendere i controlli deterministici e testabili; non sostituiscono i requisiti confermati.
+
+| ID | Descrizione | Motivazione | Impatto | Stato |
+|---|---|---|---|---|
+| ASS-001 | I valori obbligatori nulli, vuoti o contenenti soltanto spazi sono considerati mancanti. | I requisiti impongono il controllo di completezza, ma non definiscono tutte le rappresentazioni operative di un valore assente. | Il controllo di completezza tratta in modo uniforme valori nulli e stringhe prive di contenuto significativo. | Attiva |
+| ASS-002 | Date, importi, categorie e nomi vengono normalizzati prima del controllo dei duplicati logici. | I dati possono arrivare sporchi e il duplicato logico deve confrontare il contenuto della spesa, non differenze meramente formali. | Valori equivalenti dopo la normalizzazione possono essere riconosciuti come duplicati logici. | Attiva |
+| ASS-003 | Un importo è statisticamente anomalo solo se è strettamente maggiore di tre volte la mediana della categoria. | Il chiarimento usa il verbo “supera”, che viene interpretato come confronto strettamente maggiore. | Un importo esattamente uguale a tre volte la mediana non viene classificato come anomalia statistica. | Attiva |
+| ASS-004 | `approvatore` è considerato assente se nullo, vuoto o composto soltanto da spazi. | La regola di non conformità richiede di determinare in modo univoco quando l'approvatore è vuoto. | Tutte le rappresentazioni prive di contenuto significativo attivano la verifica di non conformità sulle spese sopra soglia. | Attiva |
+| ASS-005 | `valuta_originale` è informativa e non viene effettuata conversione valutaria. | Non sono stati forniti tassi di cambio; `importo` è definito in EUR e `valuta_originale` è facoltativa. | I controlli monetari utilizzano `importo` in EUR senza ricostruire o convertire l'importo originario. | Attiva |
+| ASS-006 | Il file analizzato rappresenta una singola settimana e contiene una riga di intestazione con i nomi delle colonne comunicati da Nicola. | L'analisi richiesta è settimanale e lo schema CSV confermato identifica le colonne per nome. | Ogni elaborazione considera un solo periodo settimanale e associa i valori alle colonne tramite l'intestazione prevista. | Attiva |

@@ -1,0 +1,32 @@
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Python caches
+__pycache__/
+*.py[cod]
+
+# Tool caches
+.pytest_cache/
+.ruff_cache/
+
+# Environment files
+.env
+.env.*
+
+# Build artifacts
+build/
+dist/
+*.egg-info/
+
+# Editor temporary files
+*.swp
+*.swo
+*~
+.idea/
+.vscode/
+
+# Operating system files
+.DS_Store
+Thumbs.db
