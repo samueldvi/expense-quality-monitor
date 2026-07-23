@@ -40,8 +40,7 @@ def analyze_expenses(source: CsvSource) -> AnalysisResult:
     )
     findings = pd.concat(rule_outputs, ignore_index=True)
     findings = findings.loc[:, FINDING_COLUMNS].sort_values(
-        ["source_row_number", "rule_id"],
-        kind="stable",
+        by=["source_row_number", "rule_id"],
     )
     findings = findings.reset_index(drop=True)
     summary = build_summary(source_data, findings)

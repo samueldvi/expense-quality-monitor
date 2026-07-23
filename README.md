@@ -4,7 +4,7 @@ Progetto per ridurre il controllo manuale settimanale degli export CSV delle not
 
 ## Stato attuale
 
-I requisiti sono stati consolidati, il dataset sintetico è stato progettato, il generatore deterministico è stato implementato e il design della soluzione è stato completato. Il monolite modulare include ora il motore deterministico e i relativi test unitari, di integrazione e di regressione. La dashboard completa non è ancora implementata.
+I requisiti sono consolidati e il monolite modulare include il generatore del dataset sintetico, il motore deterministico, la dashboard Streamlit e test unitari, di integrazione, regressione e interfaccia. Una CI GitHub Actions verifica generazione, test, lint, formattazione, sicurezza e compilazione. Non è previsto deployment.
 
 ## Dati
 
@@ -23,9 +23,11 @@ Il comando produce:
 
 La generazione crea 300 righe usando il seed fisso `20260713` e una settimana sintetica fissa. Il secondo file contiene la ground truth delle anomalie introdotte intenzionalmente. A parità di versione dello script, gli output sono riproducibili.
 
-## Ambiente di sviluppo
+## Installazione
 
 ```bash
+python3 -m venv .venv
+source .venv/bin/activate
 python3 -m pip install -e ".[dev]"
 ```
 
@@ -47,25 +49,34 @@ Il motore applica:
 - valutabilità statistica e anomalie oltre tre volte la mediana;
 - soglie di policy, richieste di approvazione e non conformità.
 
-## Test
+## Test e qualità
 
 ```bash
-.venv/bin/python -m pytest -q
+python3 -m pytest -q
+python3 -m ruff check .
+python3 -m ruff format --check .
+python3 -m bandit -r src app.py -c pyproject.toml
+python3 -m compileall src tests app.py
 ```
 
-## Avvio della shell Streamlit
+## Avvio della dashboard
 
 ```bash
 streamlit run app.py
 ```
 
-La shell presenta soltanto il titolo e lo stato dell'integrazione. La dashboard completa non è ancora implementata.
+Per una dimostrazione può essere caricato `data/synthetic_expenses.csv`. La dashboard mostra metriche complessive, conteggi per tipo e stato, riepilogo per categoria, filtri sulle segnalazioni e download CSV sicuro dei risultati filtrati.
 
 ## Struttura attuale
 
 ```text
 .
 ├── .gitignore
+├── .github
+│   └── workflows
+│       └── ci.yml
+├── .streamlit
+│   └── config.toml
 ├── README.md
 ├── TIME_LOG.md
 ├── app.py
@@ -99,11 +110,13 @@ La shell presenta soltanto il titolo e lo stato dell'integrazione. La dashboard 
 │           └── validity.py
 └── tests
     ├── __init__.py
+    ├── test_app.py
     ├── test_loader.py
     ├── test_package_import.py
     ├── test_pipeline_reporting.py
     ├── test_regression.py
-    └── test_rules.py
+    ├── test_rules.py
+    └── test_tool_configuration.py
 ```
 
 ## Convenzione dei commit

@@ -1,0 +1,51 @@
+name: CI
+
+on:
+  pull_request:
+    branches:
+      - main
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  quality:
+    name: Test and quality checks
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install project
+        run: python -m pip install -e ".[dev]"
+
+      - name: Regenerate synthetic dataset
+        run: python scripts/generate_dataset.py
+
+      - name: Verify generated datasets
+        run: git diff --exit-code -- data/synthetic_expenses.csv data/expected_anomalies.csv
+
+      - name: Run tests
+        run: python -m pytest -q
+
+      - name: Run Ruff lint
+        run: python -m ruff check .
+
+      - name: Check Ruff formatting
+        run: python -m ruff format --check .
+
+      - name: Run Bandit security scan
+        run: python -m bandit -r src app.py -c pyproject.toml
+
+      - name: Compile Python sources
+        run: python -m compileall src tests app.py
