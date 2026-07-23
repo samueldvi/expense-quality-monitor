@@ -54,3 +54,9 @@ Durante la revisione, l'AI ha inoltre rilevato e rifiutato una successiva istruz
 **Problema rilevato:** il loader ammetteva in generale le colonne aggiuntive, ma falliva con un `ValueError` non applicativo quando il CSV conteneva una colonna extra chiamata `source_row_number`. Il nome entrava in conflitto con la colonna tecnica aggiunta dopo il caricamento.
 
 **Correzione:** prima di aggiungere la numerazione tecnica, l'eventuale colonna in ingresso con lo stesso nome viene conservata con un nome suffissato non ambiguo. Un test di regressione verifica sia la numerazione tecnica sia la conservazione del valore originale.
+
+## REV-006 — Telemetria predefinita della dashboard
+
+**Problema rilevato:** il primo avvio headless della dashboard mostrava che Streamlit avrebbe raccolto statistiche d'uso. Questo comportamento predefinito era incoerente con il vincolo del progetto di non effettuare chiamate esterne durante l'analisi.
+
+**Correzione:** disabilitare esplicitamente la raccolta delle statistiche d'uso nella configurazione locale di Streamlit. Il successivo smoke test HTTP viene eseguito con la telemetria disattivata.
