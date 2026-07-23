@@ -4,7 +4,7 @@ Progetto per ridurre il controllo manuale settimanale degli export CSV delle not
 
 ## Stato attuale
 
-I requisiti sono stati consolidati, il dataset sintetico è stato progettato e il generatore deterministico è stato implementato. Il motore di analisi, i test e la dashboard non sono ancora implementati.
+I requisiti sono stati consolidati, il dataset sintetico è stato progettato, il generatore deterministico è stato implementato e il design della soluzione è stato completato. È stato creato lo scaffolding importabile del monolite modulare. Il motore di analisi, la dashboard completa e i test delle regole non sono ancora implementati.
 
 ## Dati
 
@@ -23,6 +23,20 @@ Il comando produce:
 
 La generazione crea 300 righe usando il seed fisso `20260713` e una settimana sintetica fissa. Il secondo file contiene la ground truth delle anomalie introdotte intenzionalmente. A parità di versione dello script, gli output sono riproducibili.
 
+## Ambiente di sviluppo
+
+```bash
+python3 -m pip install -e ".[dev]"
+```
+
+## Avvio della shell
+
+```bash
+streamlit run app.py
+```
+
+La shell presenta soltanto il titolo e lo stato dell'integrazione. Non analizza ancora file CSV.
+
 ## Struttura attuale
 
 ```text
@@ -30,17 +44,38 @@ La generazione crea 300 righe usando il seed fisso `20260713` e una settimana si
 ├── .gitignore
 ├── README.md
 ├── TIME_LOG.md
+├── app.py
 ├── data
 │   ├── expected_anomalies.csv
 │   └── synthetic_expenses.csv
 ├── docs
-    ├── ASSUNZIONI.md
-    ├── REVIEW_NOTES.md
-    ├── brief.md
-    ├── dataset.md
-    └── requirements.md
-└── scripts
-    └── generate_dataset.py
+│   ├── ASSUNZIONI.md
+│   ├── REVIEW_NOTES.md
+│   ├── brief.md
+│   ├── dataset.md
+│   ├── design.md
+│   └── requirements.md
+├── pyproject.toml
+├── scripts
+│   └── generate_dataset.py
+├── src
+│   └── expense_quality_monitor
+│       ├── __init__.py
+│       ├── config.py
+│       ├── loader.py
+│       ├── normalization.py
+│       ├── pipeline.py
+│       ├── reporting.py
+│       └── rules
+│           ├── __init__.py
+│           ├── completeness.py
+│           ├── policy.py
+│           ├── statistical.py
+│           ├── uniqueness.py
+│           └── validity.py
+└── tests
+    ├── __init__.py
+    └── test_package_import.py
 ```
 
 ## Convenzione dei commit
