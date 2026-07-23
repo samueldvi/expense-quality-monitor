@@ -29,7 +29,7 @@ Realizzare uno strumento che riceva un file di note spese, esegua automaticament
 | `descrizione` | No | Testo libero | Spesso vuoto. |
 | `importo` | Sì | Importo in EUR con separatore decimale virgola o punto | Deve essere numerico e non negativo. |
 | `valuta_originale` | No | Valuta della spesa estera | Presente in caso di spesa in valuta estera. |
-| `progetto` | Sì | Codice progetto | Esempio di formato ricevuto: `PRJ-2024-031`. |
+| `progetto` | Sì | Codice progetto | Esempio di formato ricevuto: `PRJ-2026-001`. |
 | `approvatore` | No | Valore dell'approvatore | Può mancare sulle spese sotto soglia. |
 
 ## Requisiti funzionali
