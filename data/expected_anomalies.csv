@@ -1,0 +1,44 @@
+source_row_number,id_spesa,rule_id,anomaly_type,field,expected_status,expected_message,note
+1,,COMPLETENESS_MISSING_ID_SPESA,completezza,id_spesa,incompleta,campo obbligatorio mancante: id_spesa,id_spesa intenzionalmente mancante
+2,100002,COMPLETENESS_MISSING_DATA_SPESA,completezza,data_spesa,incompleta,campo obbligatorio mancante: data_spesa,data_spesa intenzionalmente mancante
+3,100003,COMPLETENESS_MISSING_DIPENDENTE,completezza,dipendente,incompleta,campo obbligatorio mancante: dipendente,dipendente intenzionalmente mancante
+4,100004,COMPLETENESS_MISSING_CATEGORIA,completezza,categoria,incompleta,campo obbligatorio mancante: categoria,categoria intenzionalmente mancante
+5,100005,COMPLETENESS_MISSING_IMPORTO,completezza,importo,incompleta,campo obbligatorio mancante: importo,importo intenzionalmente mancante
+6,100006,COMPLETENESS_MISSING_PROGETTO,completezza,progetto,incompleta,campo obbligatorio mancante: progetto,progetto intenzionalmente mancante
+7,ID-DEMO,VALIDITY_NON_NUMERIC_ID,validità,id_spesa,non valido,id_spesa non numerico,ID non numerico
+8,100008,VALIDITY_INVALID_DATE,validità,data_spesa,non valida,data_spesa non valida,31/02/2026
+9,100009,VALIDITY_INVALID_DATE,validità,data_spesa,non valida,data_spesa non valida,15/13/2026
+10,100010,VALIDITY_INVALID_DATE,validità,data_spesa,non valida,data_spesa non valida,2026-07-14
+11,100011,VALIDITY_NEGATIVE_AMOUNT,validità,importo,non valido,importo negativo,"-12,50"
+12,100012,VALIDITY_NEGATIVE_AMOUNT,validità,importo,non valido,importo negativo,-7.25
+13,100013,VALIDITY_NON_NUMERIC_AMOUNT,validità,importo,non valido,importo non numerico,non-numerico
+14,100014,VALIDITY_NON_NUMERIC_AMOUNT,validità,importo,non valido,importo non numerico,EUR trenta
+15,100015,VALIDITY_INVALID_CATEGORY,validità,categoria,non valida,categoria non ammessa,CategoriaDemoA
+16,100016,VALIDITY_INVALID_CATEGORY,validità,categoria,non valida,categoria non ammessa,CategoriaDemoB
+17,100017,UNIQUENESS_ID_DUPLICATE,unicità,id_spesa,duplicato,id_spesa duplicato,Coppia ID
+18,100017,UNIQUENESS_ID_DUPLICATE,unicità,id_spesa,duplicato,id_spesa duplicato,Coppia ID
+19,100019,UNIQUENESS_ID_DUPLICATE,unicità,id_spesa,duplicato,id_spesa duplicato,Coppia ID
+20,100019,UNIQUENESS_ID_DUPLICATE,unicità,id_spesa,duplicato,id_spesa duplicato,Coppia ID
+21,100021,UNIQUENESS_ID_DUPLICATE,unicità,id_spesa,duplicato,id_spesa duplicato,Coppia ID
+22,100021,UNIQUENESS_ID_DUPLICATE,unicità,id_spesa,duplicato,id_spesa duplicato,Coppia ID
+23,100023,UNIQUENESS_LOGICAL_DUPLICATE,unicità,,duplicato logico,duplicato logico rilevato,Coppia 1
+24,100024,UNIQUENESS_LOGICAL_DUPLICATE,unicità,,duplicato logico,duplicato logico rilevato,Coppia 1
+25,100025,UNIQUENESS_LOGICAL_DUPLICATE,unicità,,duplicato logico,duplicato logico rilevato,Coppia 2
+26,100026,UNIQUENESS_LOGICAL_DUPLICATE,unicità,,duplicato logico,duplicato logico rilevato,Coppia 2
+27,100027,UNIQUENESS_LOGICAL_DUPLICATE,unicità,,duplicato logico,duplicato logico rilevato,Coppia 3
+28,100028,UNIQUENESS_LOGICAL_DUPLICATE,unicità,,duplicato logico,duplicato logico rilevato,Coppia 3
+29,100029,STATISTICAL_AMOUNT_ANOMALY,anomalia statistica,importo,anomalia statistica,importo superiore a 3 volte la mediana della categoria,Alloggio
+30,100030,STATISTICAL_AMOUNT_ANOMALY,anomalia statistica,importo,anomalia statistica,importo superiore a 3 volte la mediana della categoria,Trasporto
+33,100033,STATISTICAL_AMOUNT_ANOMALY,anomalia statistica,importo,anomalia statistica,importo superiore a 3 volte la mediana della categoria,Vitto
+41,100041,POLICY_APPROVAL_REQUIRED,policy,importo,richiede approvazione,richiede approvazione,Rappresentanza
+41,100041,POLICY_MISSING_APPROVER,non conformità,approvatore,non conforme,non conforme: supera soglia senza approvatore assegnato,Rappresentanza
+41,100041,STATISTICAL_AMOUNT_ANOMALY,anomalia statistica,importo,anomalia statistica,importo superiore a 3 volte la mediana della categoria,Rappresentanza
+51,100051,POLICY_APPROVAL_REQUIRED,policy,importo,richiede approvazione,richiede approvazione,Materiale
+51,100051,STATISTICAL_AMOUNT_ANOMALY,anomalia statistica,importo,anomalia statistica,importo superiore a 3 volte la mediana della categoria,Materiale
+297,100297,POLICY_APPROVAL_REQUIRED,policy,importo,richiede approvazione,richiede approvazione,Formazione
+297,100297,STATISTICAL_NOT_EVALUABLE,valutabilità statistica,categoria,non valutabile statisticamente,categoria con meno di 5 righe,Formazione
+298,100298,POLICY_APPROVAL_REQUIRED,policy,importo,richiede approvazione,richiede approvazione,Formazione
+298,100298,POLICY_MISSING_APPROVER,non conformità,approvatore,non conforme,non conforme: supera soglia senza approvatore assegnato,Formazione
+298,100298,STATISTICAL_NOT_EVALUABLE,valutabilità statistica,categoria,non valutabile statisticamente,categoria con meno di 5 righe,Formazione
+299,100299,STATISTICAL_NOT_EVALUABLE,valutabilità statistica,categoria,non valutabile statisticamente,categoria con meno di 5 righe,Formazione
+300,100300,STATISTICAL_NOT_EVALUABLE,valutabilità statistica,categoria,non valutabile statisticamente,categoria con meno di 5 righe,Formazione
