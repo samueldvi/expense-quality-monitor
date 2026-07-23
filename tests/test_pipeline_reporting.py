@@ -26,8 +26,7 @@ def test_pipeline_returns_source_findings_and_summary() -> None:
     assert result.summary["rows_with_findings"] == 1
     assert result.findings.equals(
         result.findings.sort_values(
-            ["source_row_number", "rule_id"],
-            kind="stable",
+            by=["source_row_number", "rule_id"],
         ).reset_index(drop=True)
     )
 

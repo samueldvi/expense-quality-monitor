@@ -41,12 +41,10 @@ def test_synthetic_dataset_matches_ground_truth_exactly() -> None:
     expected[text_columns] = expected[text_columns].astype(str)
 
     actual = actual.sort_values(
-        ["source_row_number", "rule_id"],
-        kind="stable",
+        by=["source_row_number", "rule_id"],
     ).reset_index(drop=True)
     expected = expected.sort_values(
-        ["source_row_number", "rule_id"],
-        kind="stable",
+        by=["source_row_number", "rule_id"],
     ).reset_index(drop=True)
 
     pd.testing.assert_frame_equal(actual, expected, check_dtype=True)

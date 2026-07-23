@@ -35,8 +35,7 @@ def filter_findings(
     if statuses:
         filtered = filtered[filtered["status"].isin(statuses)]
     return filtered.sort_values(
-        ["source_row_number", "rule_id"],
-        kind="stable",
+        by=["source_row_number", "rule_id"],
     ).reset_index(drop=True)
 
 
