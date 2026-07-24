@@ -102,9 +102,9 @@ Spiegare che specifiche, test avversariali, ground truth e smoke test hanno perm
 ## 17:00–18:30 — Case sheet e leva
 
 - Mostrare `docs/CASE_SHEET.md`.
-- Presentare la durata netta effettiva: 10h 25m.
+- Presentare la durata netta effettiva: 11h 05m.
 - Presentare la stima motivata senza AI: 18 ore.
-- Mostrare il calcolo: `18,0 / 10,4167 = 1,73×`.
+- Mostrare il calcolo: `18,0 / 11,0833 = 1,62×`.
 - Chiarire che la stima senza AI è una valutazione motivata, non una misurazione.
 - Indicare trasferibilità alta del pattern per controlli deterministici su file tabellari, ridefinendo le regole di dominio e senza affermare un riuso già avvenuto.
 

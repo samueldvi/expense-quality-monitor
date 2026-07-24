@@ -10,13 +10,13 @@ STACK:
 Python; pandas; Streamlit; pytest; Ruff; Bandit; Git; GitHub Actions; Codex; ChatGPT.
 
 ORE TUE (con AI):
-10h 25m complessive nette: 9h 00m il 23/07/2026 e 1h 25m il 24/07/2026.
+11h 05m complessive nette: 9h 00m il 23/07/2026 e 2h 05m il 24/07/2026.
 
 ORE STIMATE SENZA AI:
 18 ore. La stima considera il maggiore tempo necessario per definire le regole, implementare la soluzione, creare dataset e ground truth, preparare test, dashboard e CI, svolgere le revisioni e completare la documentazione.
 
 LEVA:
-Circa 1,73×, calcolata come `18,0 / 10,4167`.
+Circa 1,62×, calcolata come `18,0 / 11,0833`.
 
 TRASFERIBILITÀ:
 Alta. Il pattern loader → normalizzazione → regole → pipeline → reporting → dashboard può essere adattato ad altri controlli deterministici su file tabellari; le regole specifiche del dominio devono essere ridefinite. Non è stato ancora riutilizzato in altri progetti.
