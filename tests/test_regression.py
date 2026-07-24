@@ -6,7 +6,6 @@ import pandas as pd
 
 from expense_quality_monitor.pipeline import analyze_expenses
 
-
 ROOT = Path(__file__).resolve().parents[1]
 COMPARISON_COLUMNS = [
     "source_row_number",

@@ -9,7 +9,6 @@ from datetime import date, timedelta
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
 
-
 SEED = 20260713
 ROW_COUNT = 300
 WEEK_START = date(2026, 7, 13)
@@ -46,27 +45,27 @@ CATEGORY_COUNTS = {
     "Formazione": 4,
 }
 BASE_AMOUNTS = {
-    "Vitto": Decimal("18"),
-    "Trasporto": Decimal("50"),
-    "Alloggio": Decimal("70"),
-    "Materiale": Decimal("30"),
-    "Rappresentanza": Decimal("80"),
-    "Formazione": Decimal("200"),
+    "Vitto": Decimal(18),
+    "Trasporto": Decimal(50),
+    "Alloggio": Decimal(70),
+    "Materiale": Decimal(30),
+    "Rappresentanza": Decimal(80),
+    "Formazione": Decimal(200),
 }
 THRESHOLDS = {
-    "Vitto": Decimal("80"),
-    "Trasporto": Decimal("200"),
-    "Alloggio": Decimal("250"),
-    "Materiale": Decimal("150"),
-    "Rappresentanza": Decimal("300"),
-    "Formazione": Decimal("500"),
+    "Vitto": Decimal(80),
+    "Trasporto": Decimal(200),
+    "Alloggio": Decimal(250),
+    "Materiale": Decimal(150),
+    "Rappresentanza": Decimal(300),
+    "Formazione": Decimal(500),
 }
 STAT_AMOUNTS = {
-    "Vitto": Decimal("70"),
-    "Trasporto": Decimal("180"),
-    "Alloggio": Decimal("240"),
-    "Materiale": Decimal("180"),
-    "Rappresentanza": Decimal("350"),
+    "Vitto": Decimal(70),
+    "Trasporto": Decimal(180),
+    "Alloggio": Decimal(240),
+    "Materiale": Decimal(180),
+    "Rappresentanza": Decimal(350),
 }
 
 # anomaly_type, expected_status, expected_message
@@ -303,7 +302,7 @@ def add_statistical_and_policy_scenarios(
                 mark(truth, rows, index, "POLICY_MISSING_APPROVER", "approvatore", category)
 
     formation = list(range(296, 300))
-    formation_values = [Decimal("550"), Decimal("600"), Decimal("200"), Decimal("250")]
+    formation_values = [Decimal(550), Decimal(600), Decimal(200), Decimal(250)]
     for position, (index, value) in enumerate(zip(formation, formation_values)):
         rows[index]["importo"] = amount_text(value, position % 2 == 0)
         rows[index]["approvatore"] = "Approvatore002 Demo" if position == 0 else ""

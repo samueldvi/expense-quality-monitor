@@ -6,7 +6,6 @@ import pandas as pd
 
 from expense_quality_monitor.config import FINDING_COLUMNS
 
-
 FORMULA_PREFIXES = ("=", "+", "-", "@")
 
 
@@ -37,7 +36,7 @@ def build_summary(
     category_summary["rows_with_findings"] = category_summary["rows_with_findings"].astype(int)
 
     return {
-        "total_rows": int(len(source_data)),
+        "total_rows": len(source_data),
         "rows_with_findings": len(finding_rows),
         "by_anomaly_type": {
             key: int(value)

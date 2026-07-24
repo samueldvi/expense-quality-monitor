@@ -9,7 +9,6 @@ import pandas as pd
 
 from expense_quality_monitor.config import EXPECTED_COLUMNS
 
-
 CsvSource: TypeAlias = str | Path | IO[str] | IO[bytes]
 SOURCE_ROW_COLUMN = "source_row_number"
 

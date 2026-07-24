@@ -7,7 +7,6 @@ import pandas as pd
 from expense_quality_monitor.config import FINDING_COLUMNS, RULE_CATALOG
 from expense_quality_monitor.normalization import is_missing
 
-
 FindingRecord = dict[str, object]
 
 
