@@ -13,7 +13,7 @@ from expense_quality_monitor.rules import findings_frame, make_finding
 def check_validity(data: pd.DataFrame) -> pd.DataFrame:
     """Validate identifiers, dates, amounts, and strict category values."""
     records = []
-    zero = Decimal("0")
+    zero = Decimal(0)
 
     for _, row in data.iterrows():
         if not row["_missing_id_spesa"] and is_missing(row["_id_parsed"]):

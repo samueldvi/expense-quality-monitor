@@ -207,8 +207,9 @@ I test verificheranno sia le segnalazioni attese sia l'assenza di segnalazioni a
 - Si usano esclusivamente dati sintetici.
 - Il repository e l'applicazione non contengono credenziali.
 - L'analisi non effettua chiamate esterne.
-- Il caricamento applica un limite ragionevole alla dimensione del file, definito nella configurazione e verificato prima dell'elaborazione.
+- Il loader verifica lo schema e la presenza delle colonne richieste.
 - Il contenuto del CSV viene trattato come dato e non viene mai eseguito.
+- Un limite configurabile alla dimensione del caricamento resta un miglioramento futuro.
 - L'esportazione neutralizza valori testuali che potrebbero essere interpretati come formule dai fogli di calcolo.
 - La CI esegue pytest, ruff e bandit.
 - I commit dichiarano l'apporto AI tramite i prefissi `human:`, `ai-generated:` e `ai-assisted:`.
@@ -245,7 +246,7 @@ La soluzione è considerata conclusa quando:
 4. produce una tabella delle segnalazioni con le colonne minime definite;
 5. produce sul dataset sintetico un output equivalente alla ground truth, senza segnalazioni mancanti o aggiuntive;
 6. presenta nel cruscotto metriche, riepiloghi, tabella filtrabile e download previsti;
-7. supera i test unitari, di pipeline, limite e regressione;
+7. supera i test unitari, di pipeline e regressione;
 8. supera ruff e bandit nella CI GitHub Actions;
 9. non effettua chiamate esterne e non usa dati reali o credenziali;
 10. documentazione, assunzioni, note di revisione e tracciabilità dei commit restano coerenti con l'implementazione.

@@ -3,7 +3,6 @@
 from decimal import Decimal
 from types import MappingProxyType
 
-
 EXPECTED_COLUMNS = (
     "id_spesa",
     "data_spesa",
@@ -39,12 +38,12 @@ VALID_CATEGORIES = (
 
 POLICY_THRESHOLDS = MappingProxyType(
     {
-        "Vitto": Decimal("80"),
-        "Trasporto": Decimal("200"),
-        "Alloggio": Decimal("250"),
-        "Materiale": Decimal("150"),
-        "Rappresentanza": Decimal("300"),
-        "Formazione": Decimal("500"),
+        "Vitto": Decimal(80),
+        "Trasporto": Decimal(200),
+        "Alloggio": Decimal(250),
+        "Materiale": Decimal(150),
+        "Rappresentanza": Decimal(300),
+        "Formazione": Decimal(500),
     }
 )
 
@@ -137,7 +136,7 @@ RULE_CATALOG = MappingProxyType(
         "STATISTICAL_NOT_EVALUABLE": (
             "valutabilità statistica",
             "non valutabile statisticamente",
-            "categoria con meno di 5 righe",
+            "categoria con meno di 5 osservazioni utilizzabili",
         ),
         "POLICY_APPROVAL_REQUIRED": (
             "policy",

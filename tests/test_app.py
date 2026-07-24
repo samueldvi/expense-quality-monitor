@@ -6,7 +6,6 @@ from streamlit.testing.v1 import AppTest
 
 from app import counts_to_frame
 
-
 ROOT = Path(__file__).resolve().parents[1]
 
 

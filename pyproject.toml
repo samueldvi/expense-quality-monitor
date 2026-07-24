@@ -17,7 +17,7 @@ dependencies = [
 dev = [
     "bandit[toml]",
     "pytest",
-    "ruff",
+    "ruff==0.16.0",
 ]
 
 [tool.setuptools]

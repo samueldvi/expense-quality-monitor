@@ -4,6 +4,14 @@
 
 Strumento locale per automatizzare il controllo settimanale degli export CSV delle note spese. Il problema affrontato è la presenza ricorrente di dati mancanti, valori non validi, duplicati, importi anomali e spese soggette ad approvazione, oggi verificati manualmente prima del riepilogo per il CFO.
 
+Documentazione finale:
+
+- [Case study](docs/CASE_STUDY.md)
+- [Case sheet](docs/CASE_SHEET.md)
+- [Guida demo — 20 minuti](docs/DEMO.md)
+- [Retrospettiva](docs/RETROSPECTIVE.md)
+- [Note di revisione critica](docs/REVIEW_NOTES.md)
+
 ## Soluzione
 
 Il progetto implementa un monolite modulare deterministico che:
@@ -77,7 +85,7 @@ Sul dataset dimostrativo:
 - 37 righe con almeno una segnalazione;
 - 43 segnalazioni attese;
 - corrispondenza esatta con la ground truth;
-- 41 test automatici superati.
+- 42 test automatici superati.
 
 ## Installazione
 
@@ -117,7 +125,18 @@ python3 -m compileall src tests app.py
 python3 -m pip check
 ```
 
-La workflow `.github/workflows/ci.yml` esegue su push e pull request verso `main` la rigenerazione dei dataset, il controllo delle differenze, i test, Ruff, Bandit e compileall. Non sono previsti CD o deployment.
+La workflow `.github/workflows/ci.yml` esegue su push e pull request verso `main` la rigenerazione dei dataset, il controllo delle differenze, i test, Ruff, Bandit e compileall. Non sono previsti workflow CD; il deployment dimostrativo viene configurato separatamente su Streamlit Community Cloud.
+
+## Deployment
+
+L’applicazione può essere distribuita su Streamlit Community Cloud utilizzando:
+
+- repository: `samueldvi/expense-quality-monitor`;
+- branch di produzione: `main`;
+- entrypoint: `app.py`;
+- versione Python: `3.11`.
+
+Il deployment pubblico non è ancora attivo e mantiene il vincolo di utilizzare esclusivamente dati sintetici.
 
 ## Struttura del repository
 
@@ -133,15 +152,18 @@ La workflow `.github/workflows/ci.yml` esegue su push e pull request verso `main
 │   └── synthetic_expenses.csv
 ├── docs/
 │   ├── ASSUNZIONI.md
+│   ├── CASE_SHEET.md
 │   ├── CASE_STUDY.md
 │   ├── DEMO.md
 │   ├── RETROSPECTIVE.md
 │   ├── REVIEW_NOTES.md
+│   ├── assets/
 │   ├── brief.md
 │   ├── dataset.md
 │   ├── design.md
 │   └── requirements.md
 ├── pyproject.toml
+├── requirements.txt
 ├── scripts/generate_dataset.py
 ├── src/expense_quality_monitor/
 │   ├── config.py
@@ -167,12 +189,13 @@ La workflow `.github/workflows/ci.yml` esegue su push e pull request verso `main
 - nessun dato reale;
 - nessuna autenticazione, API, integrazione ERP o database;
 - nessuna analisi storica multi-settimana;
-- nessun deployment o CD;
+- nessun workflow CD e nessun deployment pubblico attualmente attivo;
+- il deployment dimostrativo è un’estensione successiva al brief e non rende l’app pronta per dati reali, né aggiunge autenticazione o persistenza;
 - nessun modello AI nel runtime.
 
 ## Commit e tracciabilità AI
 
-I messaggi di commit devono iniziare con:
+I commit che introducono o modificano contenuto usano i prefissi seguenti. I merge commit creati automaticamente da GitHub costituiscono commit tecnici e possono mantenere il messaggio generato dalla piattaforma.
 
 - `human:` per contenuto principalmente scritto o modificato dalla persona;
 - `ai-generated:` per contenuto principalmente generato dall’AI;

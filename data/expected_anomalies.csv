@@ -36,9 +36,9 @@ source_row_number,id_spesa,rule_id,anomaly_type,field,expected_status,expected_m
 51,100051,POLICY_APPROVAL_REQUIRED,policy,importo,richiede approvazione,richiede approvazione,Materiale
 51,100051,STATISTICAL_AMOUNT_ANOMALY,anomalia statistica,importo,anomalia statistica,importo superiore a 3 volte la mediana della categoria,Materiale
 297,100297,POLICY_APPROVAL_REQUIRED,policy,importo,richiede approvazione,richiede approvazione,Formazione
-297,100297,STATISTICAL_NOT_EVALUABLE,valutabilità statistica,categoria,non valutabile statisticamente,categoria con meno di 5 righe,Formazione
+297,100297,STATISTICAL_NOT_EVALUABLE,valutabilità statistica,categoria,non valutabile statisticamente,categoria con meno di 5 osservazioni utilizzabili,Formazione
 298,100298,POLICY_APPROVAL_REQUIRED,policy,importo,richiede approvazione,richiede approvazione,Formazione
 298,100298,POLICY_MISSING_APPROVER,non conformità,approvatore,non conforme,non conforme: supera soglia senza approvatore assegnato,Formazione
-298,100298,STATISTICAL_NOT_EVALUABLE,valutabilità statistica,categoria,non valutabile statisticamente,categoria con meno di 5 righe,Formazione
-299,100299,STATISTICAL_NOT_EVALUABLE,valutabilità statistica,categoria,non valutabile statisticamente,categoria con meno di 5 righe,Formazione
-300,100300,STATISTICAL_NOT_EVALUABLE,valutabilità statistica,categoria,non valutabile statisticamente,categoria con meno di 5 righe,Formazione
+298,100298,STATISTICAL_NOT_EVALUABLE,valutabilità statistica,categoria,non valutabile statisticamente,categoria con meno di 5 osservazioni utilizzabili,Formazione
+299,100299,STATISTICAL_NOT_EVALUABLE,valutabilità statistica,categoria,non valutabile statisticamente,categoria con meno di 5 osservazioni utilizzabili,Formazione
+300,100300,STATISTICAL_NOT_EVALUABLE,valutabilità statistica,categoria,non valutabile statisticamente,categoria con meno di 5 osservazioni utilizzabili,Formazione

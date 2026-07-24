@@ -3,14 +3,13 @@
 from __future__ import annotations
 
 import re
-from datetime import date, datetime
+from datetime import date
 from decimal import Decimal, InvalidOperation
 from typing import TypeGuard
 
 import pandas as pd
 
 from expense_quality_monitor.config import EXPECTED_COLUMNS, REQUIRED_FIELDS, VALID_CATEGORIES
-
 
 ID_PATTERN = re.compile(r"[0-9]+")
 AMOUNT_PATTERN = re.compile(r"[+-]?[0-9]+(?:[.,][0-9]+)?")
@@ -45,7 +44,8 @@ def parse_expense_date(value: object) -> date | None:
     if not DATE_PATTERN.fullmatch(text):
         return None
     try:
-        return datetime.strptime(text, "%d/%m/%Y").date()
+        day, month, year = (int(part) for part in text.split("/"))
+        return date(year, month, day)
     except ValueError:
         return None
 
