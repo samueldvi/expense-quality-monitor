@@ -13,7 +13,6 @@ from expense_quality_monitor.loader import CsvLoadError
 from expense_quality_monitor.pipeline import analyze_expenses
 from expense_quality_monitor.reporting import findings_to_csv
 
-
 LOGGER = logging.getLogger(__name__)
 
 

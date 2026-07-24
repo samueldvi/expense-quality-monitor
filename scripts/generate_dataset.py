@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Generate deterministic synthetic expenses and their row-level ground truth."""
 
 from __future__ import annotations
