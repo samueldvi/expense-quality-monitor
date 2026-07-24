@@ -16,7 +16,7 @@ Documentazione finale:
 
 Il progetto implementa un monolite modulare deterministico che:
 
-1. carica e valida lo schema del CSV;
+1. carica il CSV e confronta le intestazioni con lo schema canonico derivato da `EXPECTED_COLUMNS`;
 2. conserva i valori originali e crea valori di lavoro normalizzati;
 3. applica regole indipendenti di qualità, anomalia e policy;
 4. produce segnalazioni ordinate e verificabili;
@@ -70,12 +70,18 @@ Le regole, le soglie e i messaggi sono centralizzati e deterministici. L’expor
 La dashboard:
 
 - carica un CSV esclusivamente in memoria;
+- accetta separatori con virgola o punto e virgola e testo UTF-8 con o senza BOM;
+- normalizza BOM, spazi esterni e maiuscole delle intestazioni prima del confronto;
+- accetta colonne aggiuntive, che restano escluse dalle regole;
+- mostra colonne mancanti, trovate e aggiuntive quando lo schema non è compatibile;
+- rileva intestazioni duplicate dopo la normalizzazione;
+- offre un modello CSV scaricabile e il dataset locale di esempio;
 - mostra righe totali, righe con segnalazioni e segnalazioni complessive;
 - presenta conteggi per tipo, stato e categoria;
-- filtra le segnalazioni per `anomaly_type` e `status`;
-- esporta in CSV i risultati filtrati.
+- ricerca e filtra le segnalazioni per tipo, stato, categoria e regola;
+- esporta in CSV la vista corrente.
 
-Gli errori di caricamento noti vengono mostrati con messaggi comprensibili; gli errori inattesi non espongono dettagli interni o contenuti del file.
+File vuoti, contenuti illeggibili e schemi incompatibili producono messaggi specifici. Gli errori inattesi non espongono dettagli interni o contenuti del file.
 
 ## Risultati verificati
 
@@ -85,7 +91,7 @@ Sul dataset dimostrativo:
 - 37 righe con almeno una segnalazione;
 - 43 segnalazioni attese;
 - corrispondenza esatta con la ground truth;
-- 50 test automatici superati.
+- la versione corrente del branch dispone di 75 test automatici.
 
 ## Installazione
 
