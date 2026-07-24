@@ -82,7 +82,7 @@ python3 -m ruff format --check .
 python3 -m bandit -r src app.py -c pyproject.toml
 ```
 
-- Mostrare i 42 test automatici, incluso il confronto esatto con la ground truth.
+- Mostrare i 50 test automatici, incluso il confronto esatto con la ground truth.
 - Mostrare `.github/workflows/ci.yml`: rigenerazione dei dataset, verifica delle differenze, pytest, Ruff, Bandit e compileall.
 - Precisare che Bandit analizza il codice runtime in `src` e `app.py`.
 - Ricordare che la telemetria Streamlit è disabilitata, il repository non contiene credenziali e l'analisi non effettua chiamate esterne.
@@ -102,9 +102,9 @@ Spiegare che specifiche, test avversariali, ground truth e smoke test hanno perm
 ## 17:00–18:30 — Case sheet e leva
 
 - Mostrare `docs/CASE_SHEET.md`.
-- Presentare la durata netta effettiva: 10h 25m.
+- Presentare la durata netta effettiva: 12h 44m.
 - Presentare la stima motivata senza AI: 18 ore.
-- Mostrare il calcolo: `18,0 / 10,4167 = 1,73×`.
+- Mostrare il calcolo: `18,0 / 12,7333 = 1,41×`.
 - Chiarire che la stima senza AI è una valutazione motivata, non una misurazione.
 - Indicare trasferibilità alta del pattern per controlli deterministici su file tabellari, ridefinendo le regole di dominio e senza affermare un riuso già avvenuto.
 
