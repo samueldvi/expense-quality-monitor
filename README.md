@@ -85,7 +85,7 @@ Sul dataset dimostrativo:
 - 37 righe con almeno una segnalazione;
 - 43 segnalazioni attese;
 - corrispondenza esatta con la ground truth;
-- 42 test automatici superati.
+- 50 test automatici superati.
 
 ## Installazione
 

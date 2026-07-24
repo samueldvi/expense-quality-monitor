@@ -54,7 +54,7 @@ La ground truth contiene 43 segnalazioni e consente di verificare sia l’assenz
 - 37 righe con almeno una segnalazione;
 - 43 segnalazioni prodotte dal motore;
 - corrispondenza esatta tra output e ground truth;
-- 42 test automatici superati;
+- 50 test automatici superati;
 - controlli locali Ruff, Bandit e compileall superati.
 
 Il progetto non misura ancora il tempo effettivamente risparmiato nel processo amministrativo e non attribuisce un beneficio economico.
