@@ -82,8 +82,8 @@ def test_example_source_keeps_confirmed_metrics_and_rule_count() -> None:
 
 def test_incompatible_schema_shows_real_columns_and_available_actions() -> None:
     iris_csv = (
-        "sepal_length,sepal_width,petal_length,petal_width,species\n5.1,3.5,1.4,0.2,setosa\n"
-    ).encode()
+        b"sepal_length,sepal_width,petal_length,petal_width,species\n5.1,3.5,1.4,0.2,setosa\n"
+    )
 
     app = app_with_uploaded_bytes("Iris.csv", iris_csv)
 
