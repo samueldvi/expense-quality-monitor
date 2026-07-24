@@ -14,8 +14,14 @@ def test_dashboard_starts_with_required_upload_guidance() -> None:
 
     assert not app.exception
     assert app.title[0].value == "Expense Quality Monitor"
-    assert len(app.get("file_uploader")) == 1
-    assert any("esclusivamente dati sintetici" in message.value.lower() for message in app.info)
+    assert len(app.sidebar.get("file_uploader")) == 1
+    assert len(app.main.get("file_uploader")) == 0
+    assert any(
+        "esclusivamente dati sintetici" in message.value.lower() for message in app.sidebar.info
+    )
+    assert any(
+        "Carica il CSV settimanale per iniziare" in message.value for message in app.markdown
+    )
 
 
 def test_counts_to_frame_orders_values_and_preserves_columns() -> None:
