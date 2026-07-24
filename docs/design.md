@@ -80,7 +80,7 @@ Responsabilità dei componenti:
 - `app.py`: interfaccia Streamlit e gestione delle azioni dell'utente, senza logica di analisi.
 - `pyproject.toml`: metadati del progetto, dipendenze e configurazione degli strumenti.
 - `config.py`: schema atteso, categorie, soglie di policy e costanti condivise, definite in un unico punto.
-- `loader.py`: lettura del CSV come testo, verifica preliminare dello schema e gestione degli errori di acquisizione.
+- `loader.py`: lettura UTF-8 con o senza BOM, rilevamento dei separatori `,` e `;`, normalizzazione delle intestazioni, confronto con lo schema canonico e gestione degli errori di acquisizione.
 - `normalization.py`: creazione delle colonne di lavoro parsed o normalizzate senza alterare i valori originali.
 - `rules/completeness.py`: controlli sui campi obbligatori.
 - `rules/uniqueness.py`: duplicati per identificativo e duplicati logici.
@@ -96,6 +96,8 @@ Questi file descrivono la struttura prevista e non vengono creati durante la fas
 ## 5. Modello dei dati
 
 Il CSV viene caricato inizialmente come testo per preservare esattamente i valori originali, compresi spazi, separatori decimali e valori malformati. Le conversioni non sovrascrivono le colonne sorgente.
+
+Lo schema canonico deriva da `EXPECTED_COLUMNS`. Prima del confronto, il loader rimuove il BOM e gli spazi esterni dai nomi delle colonne e usa `casefold` per ricondurre le intestazioni riconosciute ai nomi canonici. Non applica alias semantici. Le colonne aggiuntive sono ammesse e non partecipano alle regole; eventuali nomi duplicati dopo la normalizzazione interrompono il caricamento.
 
 Il modello interno aggiunge:
 
@@ -165,12 +167,12 @@ La pipeline distingue tre esiti:
 
 | Caso | Comportamento |
 |---|---|
-| File non CSV | Interrompere l'analisi e indicare che è richiesto un CSV leggibile |
-| File vuoto | Interrompere l'analisi e indicare che il file non contiene dati |
-| Intestazione mancante | Interrompere l'analisi e indicare che non è possibile riconoscere lo schema |
-| Colonne obbligatorie mancanti | Interrompere l'analisi ed elencare i nomi mancanti |
-| Colonne aggiuntive | Ammetterle, conservarle se utili alla consultazione e ignorarle nei controlli |
-| Errore di lettura | Interrompere l'analisi con un messaggio sintetico che non esponga dettagli interni |
+| File non leggibile come CSV | Interrompere l'analisi e mostrare `Il contenuto non può essere letto come CSV.` |
+| File vuoto | Interrompere l'analisi e mostrare `Il file è vuoto.` |
+| Intestazione mancante o incompatibile | Interrompere l'analisi e mostrare le colonne mancanti e quelle trovate |
+| Colonne previste mancanti | Interrompere l'analisi ed elencare i nomi mancanti in ordine canonico |
+| Colonne aggiuntive | Ammetterle e indicare che non vengono utilizzate nelle regole |
+| Colonne duplicate dopo la normalizzazione | Interrompere l'analisi e mostrare `Alcune colonne hanno lo stesso nome dopo la normalizzazione.` |
 | Nessuna riga utilizzabile | Conservare le segnalazioni di qualità producibili e indicare che non esistono righe idonee ai controlli statistici e di policy |
 
 Gli errori tecnici completi possono essere registrati localmente per lo sviluppo, senza includere contenuti sensibili del CSV nell'interfaccia.

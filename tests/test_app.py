@@ -5,16 +5,19 @@ from pathlib import Path
 from unittest.mock import patch
 
 import pandas as pd
+import pytest
 from streamlit.testing.v1 import AppTest
 
 from app import (
+    TEMPLATE_FILENAME,
+    build_template_csv,
     counts_to_frame,
     distinct_rule_count,
     filter_findings,
     findings_with_categories,
     reset_workspace_view,
 )
-from expense_quality_monitor.config import FINDING_COLUMNS
+from expense_quality_monitor.config import EXPECTED_COLUMNS, FINDING_COLUMNS
 from expense_quality_monitor.pipeline import analyze_expenses
 from expense_quality_monitor.reporting import findings_to_csv
 
@@ -27,6 +30,15 @@ def loaded_example_app() -> AppTest:
     app = AppTest.from_file(ROOT / "app.py").run()
     example_button = next(button for button in app.button if button.label == "Prova con l’esempio")
     return example_button.click().run(timeout=10)
+
+
+def app_with_uploaded_bytes(name: str, content: bytes) -> AppTest:
+    """Start the app with one in-memory uploaded source."""
+    app = AppTest.from_file(ROOT / "app.py").run()
+    app.session_state["source_name"] = name
+    app.session_state["source_bytes"] = content
+    app.session_state["source_is_example"] = False
+    return app.run(timeout=10)
 
 
 def test_initial_state_offers_equal_starting_paths_and_main_copy() -> None:
@@ -66,6 +78,126 @@ def test_example_source_keeps_confirmed_metrics_and_rule_count() -> None:
         caption.value == "synthetic_expenses.csv · 300 righe · Analisi completata"
         for caption in app.caption
     )
+
+
+def test_incompatible_schema_shows_real_columns_and_available_actions() -> None:
+    iris_csv = (
+        "sepal_length,sepal_width,petal_length,petal_width,species\n5.1,3.5,1.4,0.2,setosa\n"
+    ).encode()
+
+    app = app_with_uploaded_bytes("Iris.csv", iris_csv)
+
+    assert not app.exception
+    assert app.warning[0].value == "Questo CSV non corrisponde alla struttura delle spese"
+    assert any(message.value == "Mancano 10 colonne" for message in app.markdown)
+    assert any(
+        message.value == "sepal_length, sepal_width, petal_length, petal_width, species"
+        for message in app.markdown
+    )
+    assert any(header.value == "Colonne trovate" for header in app.subheader)
+    assert any(header.value == "Colonne aggiuntive" for header in app.subheader)
+    assert any(button.label == "Scarica il modello CSV" for button in app.download_button)
+    assert any(
+        caption.value == "Scarica un CSV con le colonne già predisposte." for caption in app.caption
+    )
+    assert any(button.label == "Prova con l’esempio" for button in app.button)
+    assert any(caption.value == "File selezionato" for caption in app.sidebar.caption)
+    assert any(message.value == "Iris.csv" for message in app.sidebar.markdown)
+    assert not app.get("button_group")
+
+
+@pytest.mark.parametrize(
+    ("name", "content", "expected_message"),
+    [
+        ("vuoto.csv", b"", "Il file \u00e8 vuoto."),
+        (
+            "non-leggibile.csv",
+            b"\xff\xfe\x00",
+            "Il contenuto non pu\u00f2 essere letto come CSV.",
+        ),
+        (
+            "duplicati.csv",
+            (
+                "id_spesa, ID_SPESA ,"
+                + ",".join(EXPECTED_COLUMNS[1:])
+                + "\n100001,100002,13/07/2026,Cognome001 Nome001,CDC-001,"
+                "Vitto,Spesa sintetica,25.00,,PRJ-2026-001,Approvatore001 Demo\n"
+            ).encode(),
+            "Alcune colonne hanno lo stesso nome dopo la normalizzazione.",
+        ),
+    ],
+)
+def test_load_failures_use_specific_non_accusatory_messages(
+    name: str,
+    content: bytes,
+    expected_message: str,
+) -> None:
+    app = app_with_uploaded_bytes(name, content)
+
+    assert not app.exception
+    assert app.warning[0].value == expected_message
+    assert any(message.value == name for message in app.sidebar.markdown)
+
+
+def test_example_action_from_schema_guidance_keeps_confirmed_metrics() -> None:
+    app = app_with_uploaded_bytes("Iris.csv", b"a,b\n1,2\n")
+    example_button = next(button for button in app.button if button.label == "Prova con l’esempio")
+
+    app = example_button.click().run(timeout=10)
+
+    assert [(metric.label, metric.value) for metric in app.metric] == [
+        ("Righe", "300"),
+        ("Righe da verificare", "37"),
+        ("Segnalazioni", "43"),
+        ("Regole coinvolte", "17"),
+    ]
+
+
+def test_template_download_contains_only_the_utf8_canonical_header() -> None:
+    template = build_template_csv()
+    decoded = template.decode("utf-8")
+    parsed = pd.read_csv(StringIO(decoded), dtype=str, keep_default_na=False)
+
+    assert TEMPLATE_FILENAME == "expense_quality_monitor_template.csv"
+    assert decoded == ",".join(EXPECTED_COLUMNS) + "\n"
+    assert parsed.columns.tolist() == list(EXPECTED_COLUMNS)
+    assert parsed.empty
+
+
+def test_compatible_example_with_extra_columns_keeps_metrics_and_shows_note() -> None:
+    source = pd.read_csv(EXAMPLE_PATH, dtype=str, keep_default_na=False)
+    source["extra_zeta"] = "z"
+    source["extra_alfa"] = "a"
+    content = source.to_csv(index=False).encode()
+
+    app = app_with_uploaded_bytes("spese_con_extra.csv", content)
+
+    assert not app.exception
+    assert [(metric.label, metric.value) for metric in app.metric] == [
+        ("Righe", "300"),
+        ("Righe da verificare", "37"),
+        ("Segnalazioni", "43"),
+        ("Regole coinvolte", "17"),
+    ]
+    assert app.info[0].value == (
+        "Il file contiene 2 colonne aggiuntive che non vengono utilizzate nell’analisi."
+    )
+    assert not app.warning
+
+
+def test_semicolon_upload_is_accepted_by_the_existing_workspace() -> None:
+    source = pd.read_csv(EXAMPLE_PATH, dtype=str, keep_default_na=False)
+    content = source.to_csv(index=False, sep=";").encode()
+
+    app = app_with_uploaded_bytes("spese_semicolon.csv", content)
+
+    assert not app.exception
+    assert [(metric.label, metric.value) for metric in app.metric] == [
+        ("Righe", "300"),
+        ("Righe da verificare", "37"),
+        ("Segnalazioni", "43"),
+        ("Regole coinvolte", "17"),
+    ]
 
 
 def test_search_is_case_insensitive_across_id_rule_and_description() -> None:

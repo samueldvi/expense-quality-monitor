@@ -2,23 +2,30 @@
 
 from __future__ import annotations
 
+import csv
 import logging
 from collections.abc import Mapping, Sequence
-from io import BytesIO
+from io import BytesIO, StringIO
 from pathlib import Path
 from typing import cast
 
 import pandas as pd
 import streamlit as st
 
-from expense_quality_monitor.config import FINDING_COLUMNS
-from expense_quality_monitor.loader import CsvLoadError
+from expense_quality_monitor.config import EXPECTED_COLUMNS, FINDING_COLUMNS
+from expense_quality_monitor.loader import (
+    SOURCE_ROW_COLUMN,
+    CsvLoadError,
+    SchemaComparison,
+    compare_schema,
+)
 from expense_quality_monitor.pipeline import AnalysisResult, analyze_expenses
 from expense_quality_monitor.reporting import findings_to_csv
 
 LOGGER = logging.getLogger(__name__)
 ROOT = Path(__file__).resolve().parent
 EXAMPLE_PATH = ROOT / "data" / "synthetic_expenses.csv"
+TEMPLATE_FILENAME = "expense_quality_monitor_template.csv"
 SECTIONS = ("Panoramica", "Segnalazioni", "Dati", "Esporta")
 FILTER_KEYS = (
     "finding_search",
@@ -97,6 +104,20 @@ def distinct_rule_count(findings: pd.DataFrame) -> int:
     return int(findings["rule_id"].nunique())
 
 
+def build_template_csv() -> bytes:
+    """Return a UTF-8 CSV template containing only the canonical header."""
+    buffer = StringIO(newline="")
+    writer = csv.writer(buffer, lineterminator="\n")
+    writer.writerow(EXPECTED_COLUMNS)
+    return buffer.getvalue().encode("utf-8")
+
+
+def source_extra_columns(source_data: pd.DataFrame) -> tuple[str, ...]:
+    """Return deterministic extra source columns, excluding the technical row number."""
+    columns = [column for column in source_data.columns if column != SOURCE_ROW_COLUMN]
+    return compare_schema(columns).extra_columns
+
+
 def reset_filters() -> None:
     """Clear only the search and table filters."""
     st.session_state["finding_search"] = ""
@@ -141,12 +162,47 @@ def current_source() -> Path | BytesIO | None:
 
 def friendly_load_error(error: CsvLoadError) -> str:
     """Translate loader details into concise, actionable UI messages."""
-    detail = str(error).casefold()
-    if "colonne previste mancanti" in detail or "intestazione" in detail:
-        return "Il CSV non contiene tutte le colonne previste."
-    if "vuoto" in detail or "non contiene righe" in detail:
+    if error.code == "empty":
         return "Il file è vuoto."
+    if error.code == "duplicate_columns":
+        return "Alcune colonne hanno lo stesso nome dopo la normalizzazione."
     return "Il contenuto non può essere letto come CSV."
+
+
+def render_schema_guidance(schema: SchemaComparison) -> None:
+    """Explain an incompatible expense schema and offer useful local actions."""
+    st.warning("Questo CSV non corrisponde alla struttura delle spese")
+    st.write(
+        "Puoi confrontare le colonne del file con quelle richieste oppure partire dal modello CSV."
+    )
+    with st.container(border=True):
+        st.subheader("Colonne mancanti")
+        st.write(f"Mancano {len(schema.missing_columns)} colonne")
+        st.write(", ".join(schema.missing_columns))
+        st.subheader("Colonne trovate")
+        st.write(", ".join(schema.found_columns))
+        if schema.extra_columns:
+            st.subheader("Colonne aggiuntive")
+            st.write(", ".join(schema.extra_columns))
+
+    action_columns = st.columns(2)
+    with action_columns[0]:
+        st.caption("Scarica un CSV con le colonne già predisposte.")
+        st.download_button(
+            "Scarica il modello CSV",
+            data=build_template_csv(),
+            file_name=TEMPLATE_FILENAME,
+            mime="text/csv",
+            width="stretch",
+        )
+    with action_columns[1]:
+        st.button(
+            "Prova con l’esempio",
+            key="use_example_after_schema_error",
+            on_click=activate_example_source,
+            type="primary",
+            width="stretch",
+        )
 
 
 def render_header() -> None:
@@ -403,7 +459,10 @@ def analyze_current_source() -> AnalysisResult | None:
         with st.spinner("Analisi in corso"):
             return analyze_expenses(source)
     except CsvLoadError as error:
-        st.error(friendly_load_error(error))
+        if error.code == "incompatible_schema" and error.schema is not None:
+            render_schema_guidance(error.schema)
+        else:
+            st.warning(friendly_load_error(error))
     except Exception:
         LOGGER.exception("Errore imprevisto durante l'analisi del CSV.")
         st.error("L’analisi non è stata completata. Puoi scegliere un altro CSV.")
@@ -429,6 +488,12 @@ def render_dashboard() -> None:
     render_sidebar(result)
     source_name = cast(str, st.session_state["source_name"])
     render_file_context(source_name, len(result.source_data))
+    extra_columns = source_extra_columns(result.source_data)
+    if extra_columns:
+        st.info(
+            f"Il file contiene {len(extra_columns)} colonne aggiuntive "
+            "che non vengono utilizzate nell’analisi."
+        )
     st.session_state.setdefault("workspace_section", "Panoramica")
     section = st.segmented_control(
         "Sezione",
