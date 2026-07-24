@@ -55,7 +55,7 @@ Realizzare uno strumento che riceva un file di note spese, esegua automaticament
 - Calcolare le anomalie utilizzando esclusivamente i dati della singola settimana.
 - Valutare separatamente ogni categoria.
 - Segnalare una spesa come anomalia statistica quando il suo importo supera tre volte la mediana degli importi della categoria.
-- Se una categoria contiene meno di cinque righe, indicarla come `non valutabile statisticamente` e applicare come fallback la soglia di policy fissa della categoria.
+- Se una categoria contiene meno di cinque osservazioni utilizzabili, indicarla come `non valutabile statisticamente` e applicare come fallback la soglia di policy fissa della categoria.
 
 ### Policy e conformità
 
@@ -92,7 +92,7 @@ Realizzare uno strumento che riceva un file di note spese, esegua automaticament
 6. Due righe con lo stesso `id_spesa` vengono segnalate come duplicate.
 7. Due righe con `id_spesa` diverso ma stessi `dipendente`, `data_spesa`, `importo` e `categoria` vengono segnalate come duplicati logici.
 8. In una categoria con almeno cinque righe, un importo superiore a tre volte la mediana della categoria viene segnalato come anomalia statistica.
-9. Una categoria con meno di cinque righe viene indicata come `non valutabile statisticamente` e le sue spese vengono valutate tramite la soglia di policy fissa.
+9. Una categoria con meno di cinque osservazioni utilizzabili viene indicata come `non valutabile statisticamente` e le sue spese vengono valutate tramite la soglia di policy fissa.
 10. Una spesa sopra la soglia della propria categoria viene segnalata come `richiede approvazione`.
 11. Una spesa sopra soglia con `approvatore` valorizzato non viene classificata come non conforme per questa regola.
 12. Una spesa sopra soglia con `approvatore` vuoto riceve il messaggio `non conforme: supera soglia senza approvatore assegnato`.

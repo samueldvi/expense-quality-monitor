@@ -98,7 +98,7 @@ Le quantità indicate contano le righe del CSV principale coinvolte. Le coppie s
 | Validità | Importo non numerico | 2 righe | Rifiutare valori che non possono essere interpretati come numero |
 | Validità | Categoria non ammessa | 2 righe | Rifiutare valori esterni alle sei categorie ammesse |
 | Anomalia statistica | Importo strettamente maggiore di tre volte la mediana | 5 righe | Una riga per Vitto, Trasporto, Alloggio, Materiale e Rappresentanza |
-| Valutabilità statistica | Categoria con meno di cinque record | 4 righe Formazione | Produrre lo stato `non valutabile statisticamente` e usare il fallback di policy |
+| Valutabilità statistica | Categoria con meno di cinque osservazioni utilizzabili | 4 righe Formazione | Produrre lo stato `non valutabile statisticamente` e usare il fallback di policy |
 | Policy | Sopra soglia con approvatore | 2 righe | Produrre `richiede approvazione` senza non conformità |
 | Policy | Sopra soglia senza approvatore | 2 righe | Produrre anche `non conforme: supera soglia senza approvatore assegnato` |
 
@@ -174,7 +174,7 @@ Il catalogo minimo dei `rule_id` sarà:
 | `VALIDITY_NON_NUMERIC_AMOUNT` | `non valido` | `importo non numerico` |
 | `VALIDITY_INVALID_CATEGORY` | `non valida` | `categoria non ammessa` |
 | `STATISTICAL_AMOUNT_ANOMALY` | `anomalia statistica` | `importo superiore a 3 volte la mediana della categoria` |
-| `STATISTICAL_NOT_EVALUABLE` | `non valutabile statisticamente` | `categoria con meno di 5 righe` |
+| `STATISTICAL_NOT_EVALUABLE` | `non valutabile statisticamente` | `categoria con meno di 5 osservazioni utilizzabili` |
 | `POLICY_APPROVAL_REQUIRED` | `richiede approvazione` | `richiede approvazione` |
 | `POLICY_MISSING_APPROVER` | `non conforme` | `non conforme: supera soglia senza approvatore assegnato` |
 

@@ -148,6 +148,15 @@ def test_duplicate_identifier_marks_all_group_members() -> None:
     assert duplicate_ids["source_row_number"].tolist() == [1, 2]
 
 
+def test_duplicate_identifier_uses_exact_raw_text_without_trimming() -> None:
+    data = _working(
+        _row(1, id_spesa="10"),
+        _row(2, id_spesa=" 10 "),
+    )
+
+    assert "UNIQUENESS_ID_DUPLICATE" not in _rule_ids(check_uniqueness(data))
+
+
 def test_same_identifier_is_not_automatically_a_logical_duplicate() -> None:
     data = _working(
         _row(1, id_spesa="10", dipendente="Rossi Mario"),

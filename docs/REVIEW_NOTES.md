@@ -47,7 +47,7 @@ Durante la revisione, l'AI ha inoltre rilevato e rifiutato una successiva istruz
 - il design richiede che gli identificativi dei duplicati logici siano presenti e diversi, mentre l'interpretabilità è richiesta per dipendente, data, importo e categoria; due identificativi presenti, distinti ma non numerici devono quindi ricevere sia le segnalazioni di validità sia quelle di duplicato logico;
 - `extend-exclude` è globale e sottraeva `scripts/generate_dataset.py` sia al formatter sia al lint, rendendo il controllo Ruff meno ampio del previsto.
 
-**Correzione:** confrontare gli identificativi grezzi presenti per stabilire che siano diversi, mantenendo separata la loro validità numerica; spostare l'esclusione del generatore in `tool.ruff.format.exclude`, così il file resta incluso nel lint e nella scansione Bandit. Test avversariali indipendenti dal dataset completo verificano entrambe le correzioni.
+**Correzione:** confrontare gli identificativi grezzi presenti per stabilire che siano diversi, mantenendo separata la loro validità numerica; spostare l'esclusione del generatore in `tool.ruff.format.exclude`, così `scripts/generate_dataset.py` resta incluso nel lint Ruff ed è escluso soltanto dal formatter Ruff. Bandit analizza intenzionalmente il codice runtime con `src` e `app.py`; il generatore non è incluso nel comando Bandit attuale. Test avversariali indipendenti dal dataset completo verificano la correzione sui duplicati logici e la copertura del lint.
 
 ## REV-005 — Conflitto tra colonna aggiuntiva e numero di riga tecnico
 
@@ -60,3 +60,17 @@ Durante la revisione, l'AI ha inoltre rilevato e rifiutato una successiva istruz
 **Problema rilevato:** il primo avvio headless della dashboard mostrava che Streamlit avrebbe raccolto statistiche d'uso. Questo comportamento predefinito era incoerente con il vincolo del progetto di non effettuare chiamate esterne durante l'analisi.
 
 **Correzione:** disabilitare esplicitamente la raccolta delle statistiche d'uso nella configurazione locale di Streamlit. Il successivo smoke test HTTP viene eseguito con la telemetria disattivata.
+
+## REV-007 — Audit finale dei deliverable
+
+**Problemi rilevati:** l'audit finale, distinto dalla revisione del motore applicativo, ha rilevato l'assenza del case sheet nel formato richiesto dal brief, il registro ore ancora aperto, una guida demo troppo breve anziché di 20 minuti, una dichiarazione non implementata sul limite dimensionale del file, una descrizione inesatta dell'ambito della scansione Bandit e un messaggio di non valutabilità statistica meno preciso della logica effettiva basata sulle osservazioni utilizzabili.
+
+**Correzione:** prima della consegna sono stati creati il case sheet e la scaletta da 20 minuti, chiuso il registro con la durata netta comunicata, descritti il limite di caricamento come miglioramento futuro e l'ambito reale di Bandit, e allineato il messaggio statistico alla logica implementata. `REV-007` documenta incoerenze dei deliverable e non un problema del motore applicativo.
+
+## REV-008 — Preparazione al deployment
+
+**Contesto:** dopo il completamento dei deliverable è stato richiesto un deployment dimostrativo.
+
+**Decisione:** l'app Streamlit non è stata adattata artificialmente a Vercel. È stata preparata per Streamlit Community Cloud, mantenendo il runtime esistente e Python 3.11 come versione di destinazione. Poiché Python 3.11 non è installato nell'ambiente locale, la verifica in ambiente pulito è stata eseguita con Python 3.12, versione disponibile e compatibile con il requisito Python 3.11 o successivo; la CI resta configurata su Python 3.11.
+
+**Vincoli:** il deployment resta dimostrativo, synthetic-only, senza autenticazione, persistenza o dati reali. Il deployment non è stato eseguito e non esiste ancora un URL verificato.

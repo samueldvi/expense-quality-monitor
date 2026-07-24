@@ -119,7 +119,7 @@ RULES = {
     "STATISTICAL_NOT_EVALUABLE": (
         "valutabilità statistica",
         "non valutabile statisticamente",
-        "categoria con meno di 5 righe",
+        "categoria con meno di 5 osservazioni utilizzabili",
     ),
     "POLICY_APPROVAL_REQUIRED": (
         "policy", "richiede approvazione", "richiede approvazione"
