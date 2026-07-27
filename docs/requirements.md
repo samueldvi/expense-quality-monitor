@@ -111,7 +111,9 @@ Realizzare uno strumento che riceva un file di note spese, esegua automaticament
 
 - Non devono essere usati dati aziendali o di clienti reali: sono ammessi esclusivamente dati sintetici.
 - I dati reali di clienti non devono essere inseriti nei prompt.
-- Ogni commit dovrà indicare chiaramente se il contenuto è principalmente scritto o modificato dalla persona, generato dall'AI oppure realizzato con assistenza AI.
+- I messaggi di commit devono descrivere il contenuto della modifica secondo le convenzioni
+  definite in `CONTRIBUTING.md`; l'eventuale assistenza AI resta soggetta a revisione umana
+  e non determina il tipo di commit.
 - Le assunzioni dovranno essere dichiarate esplicitamente senza presentarle come requisiti.
 - Almeno due casi reali di correzione, rifiuto o modifica critica di output AI dovranno essere annotati durante il progetto.
 

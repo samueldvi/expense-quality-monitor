@@ -125,7 +125,10 @@ Responsabilità, scelte e alternative sono descritte nel [design della soluzione
 
 L’AI è stata usata come supporto durante implementazione, revisione e documentazione, con un processo **human-in-the-loop**. Requisiti, assunzioni e decisioni sono stati verificati dall’autore; ogni modifica è stata riesaminata tramite diff e sottoposta ai controlli disponibili prima dell’accettazione. Nessun modello AI viene eseguito nel runtime dell’applicazione.
 
-Le correzioni degli output AI sono registrate nelle [note di revisione](docs/REVIEW_NOTES.md); la valutazione del processo è raccolta nella [retrospettiva](docs/RETROSPECTIVE.md).
+Per le convenzioni di sviluppo e il processo di revisione, consultare
+[CONTRIBUTING.md](CONTRIBUTING.md). Le correzioni degli output AI sono registrate nelle
+[note di revisione](docs/REVIEW_NOTES.md); la valutazione del processo è raccolta nella
+[retrospettiva](docs/RETROSPECTIVE.md).
 
 ## Limiti attuali
 

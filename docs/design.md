@@ -214,7 +214,9 @@ I test verificheranno sia le segnalazioni attese sia l'assenza di segnalazioni a
 - Un limite configurabile alla dimensione del caricamento resta un miglioramento futuro.
 - L'esportazione neutralizza valori testuali che potrebbero essere interpretati come formule dai fogli di calcolo.
 - La CI esegue pytest, ruff e bandit.
-- I commit dichiarano l'apporto AI tramite i prefissi `human:`, `ai-generated:` e `ai-assisted:`.
+- I commit descrivono il contenuto della modifica secondo le convenzioni definite in
+  `CONTRIBUTING.md`; l'assistenza AI è documentata come parte del processo di revisione e
+  non come categoria del commit.
 - L'AI assiste sviluppo e revisione, ma non riceve i dati analizzati e non opera nel runtime.
 
 ## 12. Alternative considerate
