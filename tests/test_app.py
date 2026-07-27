@@ -1,6 +1,7 @@
 """Tests for the Streamlit product experience and UI-only transformations."""
 
 import hashlib
+import struct
 from io import StringIO
 from pathlib import Path
 from types import SimpleNamespace
@@ -37,6 +38,17 @@ from expense_quality_monitor.reporting import findings_to_csv
 ROOT = Path(__file__).resolve().parents[1]
 EXAMPLE_PATH = ROOT / "data" / "synthetic_expenses.csv"
 HERO_PATH = ROOT / "docs" / "assets" / "dashboard-hero.svg"
+DASHBOARD_PREVIEW_PATH = ROOT / "docs" / "assets" / "dashboard-overview.png"
+WORKFLOW_PATH = ROOT / "docs" / "assets" / "expense-quality-monitor-flow.png"
+README_PATH = ROOT / "README.md"
+
+
+def png_dimensions(path: Path) -> tuple[int, int]:
+    """Return dimensions from a PNG signature and IHDR header."""
+    header = path.read_bytes()[:24]
+    assert header[:8] == b"\x89PNG\r\n\x1a\n"
+    assert header[12:16] == b"IHDR"
+    return struct.unpack(">II", header[16:24])
 
 
 def loaded_example_app(language: str = "it") -> AppTest:
@@ -100,16 +112,41 @@ def test_initial_state_offers_equal_starting_paths_and_main_copy() -> None:
     assert not app.warning
 
 
-def test_initial_hero_uses_local_text_free_svg_and_localized_description() -> None:
+def test_documentation_assets_are_local_safe_and_referenced() -> None:
     app = AppTest.from_file(ROOT / "app.py").run()
     svg_root = ElementTree.parse(HERO_PATH).getroot()
+    svg_source = HERO_PATH.read_text(encoding="utf-8")
+    readme = README_PATH.read_text(encoding="utf-8")
     accessible_svg = accessible_hero_svg(
         "Illustrazione astratta di una tabella verificata da controlli di qualità"
     )
 
     assert HERO_PATH.is_file()
+    assert DASHBOARD_PREVIEW_PATH.is_file()
+    assert WORKFLOW_PATH.is_file()
+    assert all(
+        width > 0 and height > 0
+        for width, height in (
+            png_dimensions(DASHBOARD_PREVIEW_PATH),
+            png_dimensions(WORKFLOW_PATH),
+        )
+    )
     assert svg_root.tag.endswith("svg")
     assert not any(element.tag.endswith("text") for element in svg_root.iter())
+    assert not any(element.tag.endswith("script") for element in svg_root.iter())
+    external_references = [
+        value
+        for element in svg_root.iter()
+        for attribute, value in element.attrib.items()
+        if attribute.endswith("href") and value.startswith(("http://", "https://"))
+    ]
+    assert not external_references
+    assert "/Users/" not in svg_source
+    assert "![Panoramica di Expense Quality Monitor](docs/assets/dashboard-overview.png)" in readme
+    assert (
+        "![Flusso di Expense Quality Monitor](docs/assets/expense-quality-monitor-flow.png)"
+        in readme
+    )
     assert '<img src="data:image/svg+xml,' in accessible_svg
     assert "base64" not in accessible_svg
     assert (
