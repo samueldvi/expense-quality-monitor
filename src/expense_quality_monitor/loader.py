@@ -37,6 +37,15 @@ class SchemaComparison:
         return not self.missing_columns
 
 
+@dataclass(frozen=True)
+class CsvFormatMetadata:
+    """Language-independent format details detected while reading a CSV source."""
+
+    delimiter: str
+    encoding: str
+    has_bom: bool
+
+
 class CsvLoadError(ValueError):
     """User-facing error raised when an expense CSV cannot be loaded safely."""
 
@@ -112,7 +121,7 @@ def normalize_dataframe_columns(data: pd.DataFrame) -> pd.DataFrame:
     return normalized
 
 
-def _read_source_text(source: CsvSource) -> str:
+def _read_source_text(source: CsvSource) -> tuple[str, bool]:
     """Read one supported source as UTF-8 text while accepting an optional BOM."""
     try:
         if isinstance(source, (str, Path)):
@@ -126,15 +135,16 @@ def _read_source_text(source: CsvSource) -> str:
         ) from error
 
     if isinstance(payload, bytes):
+        has_bom = payload.startswith(b"\xef\xbb\xbf")
         try:
-            return payload.decode("utf-8-sig")
+            return payload.decode("utf-8-sig"), has_bom
         except UnicodeDecodeError as error:
             raise CsvLoadError(
                 _UNREADABLE_CSV_MESSAGE,
                 code=_CSV_ERROR_UNREADABLE,
             ) from error
     if isinstance(payload, str):
-        return payload.lstrip("\ufeff")
+        return payload.lstrip("\ufeff"), payload.startswith("\ufeff")
     raise CsvLoadError(
         _UNREADABLE_CSV_MESSAGE,
         code=_CSV_ERROR_UNREADABLE,
@@ -161,6 +171,16 @@ def detect_csv_format(content: str) -> str:
             code=_CSV_ERROR_UNREADABLE,
         )
     return dialect.delimiter
+
+
+def inspect_csv_source(source: CsvSource) -> CsvFormatMetadata:
+    """Return format metadata using the same detection path as the loader."""
+    content, has_bom = _read_source_text(source)
+    return CsvFormatMetadata(
+        delimiter=detect_csv_format(content),
+        encoding="utf-8",
+        has_bom=has_bom,
+    )
 
 
 def _reject_duplicate_headers(content: str, delimiter: str) -> None:
@@ -196,7 +216,7 @@ def _preserve_conflicting_source_column(data: pd.DataFrame) -> pd.DataFrame:
 
 def load_expenses(source: CsvSource) -> pd.DataFrame:
     """Load a CSV source as text, preserve raw values, and add row numbers."""
-    content = _read_source_text(source)
+    content, _ = _read_source_text(source)
     delimiter = detect_csv_format(content)
     _reject_duplicate_headers(content, delimiter)
 

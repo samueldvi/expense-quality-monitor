@@ -76,5 +76,7 @@ python -m pytest -q
 python -m ruff check .
 python -m ruff format --check .
 python -m bandit -r src app.py -c pyproject.toml
+python -m compileall src tests app.py
+python -m pip check
 git diff --check
 ```

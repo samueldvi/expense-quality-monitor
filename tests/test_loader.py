@@ -14,6 +14,7 @@ from expense_quality_monitor.loader import (
     CsvLoadError,
     compare_schema,
     detect_csv_format,
+    inspect_csv_source,
     load_expenses,
     normalize_column_name,
 )
@@ -116,6 +117,29 @@ def test_loader_accepts_utf8_bytes_with_bom() -> None:
     loaded = load_expenses(BytesIO(content))
 
     assert tuple(loaded.columns[1:]) == EXPECTED_COLUMNS
+
+
+@pytest.mark.parametrize(
+    ("payload", "delimiter", "has_bom"),
+    [
+        (b"a,b\n1,2\n", ",", False),
+        ("a;b\n1;2\n", ";", False),
+        (b"\xef\xbb\xbfa,b\n1,2\n", ",", True),
+        ("\ufeffa;b\n1;2\n", ";", True),
+    ],
+)
+def test_inspect_csv_source_uses_loader_detection(
+    payload: bytes | str,
+    delimiter: str,
+    has_bom: bool,
+) -> None:
+    source = BytesIO(payload) if isinstance(payload, bytes) else StringIO(payload)
+
+    metadata = inspect_csv_source(source)
+
+    assert metadata.delimiter == delimiter
+    assert metadata.encoding == "utf-8"
+    assert metadata.has_bom is has_bom
 
 
 def test_loader_exposes_real_schema_details_when_columns_are_missing() -> None:
