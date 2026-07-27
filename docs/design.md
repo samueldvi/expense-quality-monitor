@@ -2,9 +2,7 @@
 
 ## 1. Contesto e obiettivo
 
-L'Ufficio Amministrazione riceve ogni settimana un CSV di note spese che può contenere dati mancanti, duplicati, valori non validi, importi anomali e spese soggette a policy. Il controllo manuale e la preparazione del riepilogo per il CFO richiedono circa cinque ore alla settimana.
-
-La soluzione deve caricare un export settimanale, applicare controlli deterministici di qualità e anomalia, produrre una tabella di segnalazioni verificabile e presentare un riepilogo essenziale tramite un cruscotto. I requisiti completi e i criteri di accettazione sono definiti in `docs/requirements.md`.
+Questo documento descrive l'architettura implementata per caricare un CSV settimanale di note spese, applicare controlli deterministici e presentare segnalazioni verificabili tramite una dashboard. I requisiti e i criteri di accettazione sono definiti in `docs/requirements.md`.
 
 ## 2. Vincoli
 
@@ -17,11 +15,11 @@ La soluzione deve caricare un export settimanale, applicare controlli determinis
 
 ## 3. Architettura scelta
 
-La soluzione sarà un monolite modulare in Python. Questa scelta è adeguata perché il progetto è seguito da un singolo sviluppatore, dura cinque giorni, realizza un solo flusso applicativo e tratta un dataset settimanale contenuto. Non esistono esigenze di scalare o distribuire separatamente i componenti; i microservizi introdurrebbero comunicazione tra processi, deployment e gestione operativa non giustificati.
+La soluzione è un monolite modulare in Python. Questa scelta è adeguata perché il progetto realizza un solo flusso applicativo e tratta un dataset settimanale contenuto. Non esistono esigenze di scalare o distribuire separatamente i componenti; i microservizi introdurrebbero comunicazione tra processi, deployment e gestione operativa non giustificati.
 
-I moduli interni avranno responsabilità e interfacce chiare. Potranno essere separati in futuro soltanto se emergerà una necessità concreta.
+I moduli interni hanno responsabilità e interfacce chiare. Potranno essere separati in futuro soltanto se emergerà una necessità concreta.
 
-Il flusso applicativo previsto è:
+Il flusso applicativo è:
 
 1. caricamento del CSV;
 2. verifica dello schema;
@@ -43,15 +41,15 @@ Il flusso applicativo previsto è:
 - bandit per il controllo di sicurezza del codice Python;
 - GitHub Actions per una CI minima.
 
-Non sono previsti CD o deployment in questa fase.
+La CI non include CD; il deployment dimostrativo è gestito separatamente su Streamlit Community Cloud.
 
 ### Uso dell'AI
 
 L'AI viene usata nel processo di sviluppo e di revisione, non nel runtime dell'applicazione. Le regole sono già formalizzate e devono produrre risultati deterministici. Un modello generativo nel runtime aggiungerebbe variabilità, costi, complessità e rischi di privacy, rendendo inoltre più difficili test e audit.
 
-## 4. Struttura prevista
+## 4. Struttura applicativa
 
-La struttura applicativa prevista è:
+La struttura applicativa è:
 
 ```text
 expense-quality-monitor/
@@ -90,8 +88,6 @@ Responsabilità dei componenti:
 - `pipeline.py`: ordinamento ed esecuzione coordinata delle fasi, senza duplicare le singole regole.
 - `reporting.py`: riepiloghi, ordinamento delle segnalazioni ed esportazione CSV.
 - `tests/`: test unitari, di integrazione e di regressione.
-
-Questi file descrivono la struttura prevista e non vengono creati durante la fase di design.
 
 ## 5. Modello dei dati
 
@@ -139,21 +135,11 @@ Una categoria è statisticamente valutabile soltanto se contiene almeno cinque o
 
 ## 7. Regole
 
-Il dettaglio vincolante delle regole è in `docs/requirements.md`. Il motore applica sinteticamente:
-
-- completezza di `id_spesa`, `data_spesa`, `dipendente`, `categoria`, `importo` e `progetto`;
-- duplicati per `id_spesa` ripetuto;
-- duplicati logici con identificativi diversi e uguaglianza normalizzata di dipendente, data, importo e categoria, soltanto quando tutti e quattro i valori sono presenti e interpretabili;
-- validità dell'identificativo numerico, della data `DD/MM/YYYY`, dell'importo numerico non negativo e della categoria strettamente ammessa;
-- anomalia statistica per importo strettamente maggiore di tre volte la mediana della categoria nella singola settimana;
-- stato `non valutabile statisticamente` per categorie con meno di cinque osservazioni utilizzabili, con applicazione della policy come fallback;
-- soglie di policy: Vitto 80 EUR, Trasporto 200 EUR, Alloggio 250 EUR, Materiale 150 EUR, Rappresentanza 300 EUR e Formazione 500 EUR;
-- stato `richiede approvazione` per ogni spesa con importo strettamente maggiore della soglia della propria categoria;
-- non conformità soltanto per una spesa sopra soglia con `approvatore` assente, cioè nullo, vuoto o composto soltanto da spazi.
-
-Anomalia statistica, richiesta di approvazione e non conformità restano classificazioni distinte.
+Il dettaglio vincolante delle regole, comprese soglie e condizioni, è in `docs/requirements.md`. I moduli in `rules/` separano completezza, unicità, validità, statistica e policy; la pipeline ne coordina l'esecuzione senza ridefinirne la logica.
 
 Il confronto dei duplicati logici esclude le righe in cui dipendente, data, importo o categoria sono mancanti o non interpretabili. In particolare, la data deve essere valida, l'importo deve essere numerico e non negativo e la categoria deve coincidere esattamente con un valore ammesso. Queste righe conservano le proprie segnalazioni di completezza o validità, ma non generano falsi duplicati logici.
+
+Anomalia statistica, richiesta di approvazione e non conformità restano classificazioni distinte, anche quando più regole producono segnalazioni sulla stessa riga.
 
 ## 8. Gestione degli errori
 
@@ -167,19 +153,19 @@ La pipeline distingue tre esiti:
 
 | Caso | Comportamento |
 |---|---|
-| File non leggibile come CSV | Interrompere l'analisi e mostrare `Il contenuto non può essere letto come CSV.` |
-| File vuoto | Interrompere l'analisi e mostrare `Il file è vuoto.` |
-| Intestazione mancante o incompatibile | Interrompere l'analisi e mostrare le colonne mancanti e quelle trovate |
-| Colonne previste mancanti | Interrompere l'analisi ed elencare i nomi mancanti in ordine canonico |
-| Colonne aggiuntive | Ammetterle e indicare che non vengono utilizzate nelle regole |
-| Colonne duplicate dopo la normalizzazione | Interrompere l'analisi e mostrare `Alcune colonne hanno lo stesso nome dopo la normalizzazione.` |
-| Nessuna riga utilizzabile | Conservare le segnalazioni di qualità producibili e indicare che non esistono righe idonee ai controlli statistici e di policy |
+| File non leggibile come CSV | Interrompe l'analisi e mostra `Il contenuto non può essere letto come CSV.` |
+| File vuoto | Interrompe l'analisi e mostra `Il file è vuoto.` |
+| Intestazione mancante o incompatibile | Interrompe l'analisi e mostra le colonne mancanti e quelle trovate |
+| Colonne previste mancanti | Interrompe l'analisi ed elenca i nomi mancanti in ordine canonico |
+| Colonne aggiuntive | Le ammette e indica che non sono utilizzate nelle regole |
+| Colonne duplicate dopo la normalizzazione | Interrompe l'analisi e mostra `Alcune colonne hanno lo stesso nome dopo la normalizzazione.` |
+| Nessuna riga utilizzabile | Conserva le segnalazioni di qualità producibili e indica che non esistono righe idonee ai controlli statistici e di policy |
 
 Gli errori tecnici completi possono essere registrati localmente per lo sviluppo, senza includere contenuti sensibili del CSV nell'interfaccia.
 
 ## 9. Dashboard
 
-La dashboard Streamlit sarà funzionale ed essenziale. Prevederà soltanto:
+La dashboard Streamlit comprende:
 
 - caricamento del CSV;
 - numero totale di righe;
@@ -189,7 +175,7 @@ La dashboard Streamlit sarà funzionale ed essenziale. Prevederà soltanto:
 - tabella filtrabile delle anomalie;
 - download CSV delle segnalazioni.
 
-La logica di analisi resterà nei moduli applicativi e non nell'interfaccia. L'estetica non è un obiettivo prioritario.
+La logica di analisi resta nei moduli applicativi e non nell'interfaccia.
 
 ## 10. Strategia di test
 
@@ -202,7 +188,7 @@ La strategia comprende:
 - test di regressione su `data/synthetic_expenses.csv`;
 - test separati per le sovrapposizioni intenzionali tra valutabilità statistica, anomalie statistiche, policy e non conformità.
 
-I test verificheranno sia le segnalazioni attese sia l'assenza di segnalazioni aggiuntive.
+I test verificano sia le segnalazioni attese sia l'assenza di segnalazioni aggiuntive.
 
 ## 11. Sicurezza e governance
 
@@ -236,21 +222,6 @@ I test verificheranno sia le segnalazioni attese sia l'assenza di segnalazioni a
 - integrazione con ERP;
 - analisi storica multi-settimana;
 - conversione valutaria;
-- deployment e CD;
+- CD;
 - microservizi;
 - modelli AI nel runtime.
-
-## 14. Criteri di completamento
-
-La soluzione è considerata conclusa quando:
-
-1. accetta un CSV che contiene le colonne obbligatorie, conserva i valori originali e non applica controlli alle eventuali colonne aggiuntive;
-2. gestisce con messaggi comprensibili tutti gli errori di acquisizione definiti nel design;
-3. applica tutte le regole confermate nell'ordine stabilito senza doppie segnalazioni non previste;
-4. produce una tabella delle segnalazioni con le colonne minime definite;
-5. produce sul dataset sintetico un output equivalente alla ground truth, senza segnalazioni mancanti o aggiuntive;
-6. presenta nel cruscotto metriche, riepiloghi, tabella filtrabile e download previsti;
-7. supera i test unitari, di pipeline e regressione;
-8. supera ruff e bandit nella CI GitHub Actions;
-9. non effettua chiamate esterne e non usa dati reali o credenziali;
-10. documentazione, assunzioni, note di revisione e tracciabilità dei commit restano coerenti con l'implementazione.
