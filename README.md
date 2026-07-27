@@ -16,7 +16,9 @@ Usare esclusivamente dati sintetici o controllati, privi di informazioni azienda
 
 ## Anteprima
 
-<!-- Screenshot della dashboard da aggiungere in docs/assets/dashboard-overview.png -->
+![Panoramica di Expense Quality Monitor](docs/assets/dashboard-overview.png)
+
+Panoramica del file di esempio dopo l’esecuzione dei controlli.
 
 ## Per chi è pensato
 
