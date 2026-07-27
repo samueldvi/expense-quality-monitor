@@ -15,9 +15,12 @@ from app import (
     activate_uploaded_source,
     build_template_csv,
     counts_to_frame,
+    current_language,
     distinct_rule_count,
     filter_findings,
+    findings_for_presentation,
     findings_with_categories,
+    initialize_language,
     render_findings_download,
     reset_workspace_view,
 )
@@ -29,19 +32,27 @@ ROOT = Path(__file__).resolve().parents[1]
 EXAMPLE_PATH = ROOT / "data" / "synthetic_expenses.csv"
 
 
-def loaded_example_app() -> AppTest:
+def loaded_example_app(language: str = "it") -> AppTest:
     """Start the app and select its versioned example source."""
-    app = AppTest.from_file(ROOT / "app.py").run()
-    example_button = next(button for button in app.button if button.label == "Prova con l’esempio")
+    app = AppTest.from_file(ROOT / "app.py")
+    app.session_state["language"] = language
+    app = app.run()
+    example_label = "Prova con l’esempio" if language == "it" else "Try the example"
+    example_button = next(button for button in app.button if button.label == example_label)
     return example_button.click().run(timeout=10)
 
 
-def app_with_uploaded_bytes(name: str, content: bytes) -> AppTest:
+def app_with_uploaded_bytes(
+    name: str,
+    content: bytes,
+    language: str = "it",
+) -> AppTest:
     """Start the app with one in-memory uploaded source."""
     app = AppTest.from_file(ROOT / "app.py").run()
     app.session_state["source_name"] = name
     app.session_state["source_bytes"] = content
     app.session_state["source_is_example"] = False
+    app.session_state["language"] = language
     return app.run(timeout=10)
 
 
@@ -64,6 +75,48 @@ def test_initial_state_offers_equal_starting_paths_and_main_copy() -> None:
     assert not app.warning
 
 
+def test_language_initialization_uses_locale_once_and_preserves_explicit_choice() -> None:
+    session_state: dict[str, object] = {}
+    with (
+        patch("app.st.session_state", session_state),
+        patch("app.st.context", SimpleNamespace(locale="en-US")),
+    ):
+        initialize_language()
+
+    assert session_state["language"] == "en"
+
+    session_state["language"] = "it"
+    with (
+        patch("app.st.session_state", session_state),
+        patch("app.st.context", SimpleNamespace(locale="en-US")),
+    ):
+        initialize_language()
+
+    assert session_state["language"] == "it"
+
+
+@pytest.mark.parametrize(
+    "context",
+    [SimpleNamespace(), SimpleNamespace(locale=None)],
+)
+def test_language_initialization_handles_a_context_without_locale(
+    context: SimpleNamespace,
+) -> None:
+    session_state: dict[str, object] = {}
+    with (
+        patch("app.st.session_state", session_state),
+        patch("app.st.context", context),
+    ):
+        initialize_language()
+
+    assert session_state["language"] == "it"
+
+
+def test_current_language_normalizes_an_unsupported_session_value() -> None:
+    with patch("app.st.session_state", {"language": "fr-FR"}):
+        assert current_language() == "it"
+
+
 def test_example_source_keeps_confirmed_metrics_and_rule_count() -> None:
     app = loaded_example_app()
 
@@ -76,7 +129,7 @@ def test_example_source_keeps_confirmed_metrics_and_rule_count() -> None:
     ]
     navigation = app.get("button_group")[0]
     assert navigation.options == ["Panoramica", "Segnalazioni", "Dati", "Esporta"]
-    assert navigation.value == "Panoramica"
+    assert navigation.value == "overview"
     assert app.sidebar.get("file_uploader")[0].label == "Scegli un altro CSV"
     assert any(
         caption.value == "synthetic_expenses.csv · 300 righe · Analisi completata"
@@ -243,7 +296,7 @@ def test_search_is_case_insensitive_across_id_rule_and_description() -> None:
 
 def test_reset_filters_keeps_source_and_clears_table_controls() -> None:
     app = loaded_example_app()
-    app = app.get("button_group")[0].set_value("Segnalazioni").run(timeout=10)
+    app = app.get("button_group")[0].set_value("findings").run(timeout=10)
     app = app.text_input[0].input("PoLiCy").run(timeout=10)
     app = app.multiselect[0].select("policy").run(timeout=10)
 
@@ -258,7 +311,7 @@ def test_reset_filters_keeps_source_and_clears_table_controls() -> None:
 
 def test_source_change_restores_overview_and_clears_filters() -> None:
     session_state = {
-        "workspace_section": "Esporta",
+        "workspace_section": "export",
         "finding_search": "policy",
         "filter_types": ["policy"],
         "filter_statuses": ["richiede approvazione"],
@@ -270,13 +323,27 @@ def test_source_change_restores_overview_and_clears_filters() -> None:
         reset_workspace_view()
 
     assert session_state == {
-        "workspace_section": "Panoramica",
+        "workspace_section": "overview",
+        "workspace_section_widget": "overview",
         "finding_search": "",
         "filter_types": [],
         "filter_statuses": [],
         "filter_categories": [],
         "filter_rules": [],
     }
+
+
+def test_invalid_navigation_state_returns_to_the_stable_default() -> None:
+    app = loaded_example_app()
+    app.session_state["workspace_section"] = "invalid"
+    app.session_state["workspace_section_widget"] = "export"
+
+    app = app.run(timeout=10)
+
+    assert app.session_state["workspace_section"] == "overview"
+    assert app.session_state["workspace_section_widget"] == "overview"
+    assert app.get("button_group")[0].value == "overview"
+    assert any(header.value == "Categorie" for header in app.subheader)
 
 
 def test_upload_and_example_store_the_same_source_keys() -> None:
@@ -346,16 +413,182 @@ def test_data_and_export_sections_present_factual_context() -> None:
     app = loaded_example_app()
     navigation = app.get("button_group")[0]
 
-    app = navigation.set_value("Dati").run(timeout=10)
+    app = navigation.set_value("data").run(timeout=10)
     assert any(header.value == "Dati" for header in app.subheader)
     assert any(
         "Qui puoi controllare il contenuto ricevuto" in message.value for message in app.markdown
     )
 
     navigation = app.get("button_group")[0]
-    app = navigation.set_value("Esporta").run(timeout=10)
+    app = navigation.set_value("export").run(timeout=10)
     assert any(header.value == "Esporta" for header in app.subheader)
     assert any(button.label == "Scarica la vista corrente" for button in app.get("download_button"))
+
+
+def test_english_initial_state_and_language_selector_use_explicit_copy() -> None:
+    app = AppTest.from_file(ROOT / "app.py")
+    app.session_state["language"] = "en"
+    app = app.run()
+
+    assert not app.exception
+    assert app.title[0].value == "Expense Quality Monitor"
+    assert any(
+        message.value == "Check the file, identify exceptions, and prepare the summary."
+        for message in app.markdown
+    )
+    assert app.subheader[0].value == "Where would you like to start?"
+    assert app.main.get("file_uploader")[0].label == "Choose a CSV"
+    assert any(button.label == "Try the example" for button in app.button)
+    language_selector = app.sidebar.selectbox[0]
+    assert language_selector.label == "Language"
+    assert language_selector.options == ["Italiano", "English"]
+    assert language_selector.value == "en"
+
+
+def test_english_example_keeps_metrics_and_uses_stable_navigation_ids() -> None:
+    app = loaded_example_app("en")
+
+    assert not app.exception
+    assert [(metric.label, metric.value) for metric in app.metric] == [
+        ("Rows", "300"),
+        ("Rows to review", "37"),
+        ("Findings", "43"),
+        ("Rules involved", "17"),
+    ]
+    navigation = app.get("button_group")[0]
+    assert navigation.options == ["Overview", "Findings", "Data", "Export"]
+    assert navigation.value == "overview"
+    assert any(
+        caption.value == "synthetic_expenses.csv · 300 rows · Analysis complete"
+        for caption in app.caption
+    )
+
+
+def test_english_schema_guidance_translates_copy_but_not_column_names() -> None:
+    iris_csv = (
+        b"sepal_length,sepal_width,petal_length,petal_width,species\n5.1,3.5,1.4,0.2,setosa\n"
+    )
+
+    app = app_with_uploaded_bytes("Iris.csv", iris_csv, language="en")
+
+    assert not app.exception
+    assert app.warning[0].value == "This CSV does not match the expense structure"
+    assert any(message.value == "10 columns are missing" for message in app.markdown)
+    assert any(header.value == "Found columns" for header in app.subheader)
+    assert any(header.value == "Extra columns" for header in app.subheader)
+    assert any(button.label == "Download the CSV template" for button in app.download_button)
+    assert any(
+        message.value.startswith("id_spesa, data_spesa, dipendente") for message in app.markdown
+    )
+
+
+def test_english_extra_column_message_keeps_confirmed_metrics() -> None:
+    source = pd.read_csv(EXAMPLE_PATH, dtype=str, keep_default_na=False)
+    source["extra_column"] = "value"
+
+    app = app_with_uploaded_bytes(
+        "expenses_with_extra.csv",
+        source.to_csv(index=False).encode(),
+        language="en",
+    )
+
+    assert not app.exception
+    assert app.info[0].value == (
+        "The file contains 1 extra column that is not used in the analysis."
+    )
+    assert [(metric.label, metric.value) for metric in app.metric] == [
+        ("Rows", "300"),
+        ("Rows to review", "37"),
+        ("Findings", "43"),
+        ("Rules involved", "17"),
+    ]
+
+
+def test_english_search_filters_localized_messages_with_canonical_values() -> None:
+    app = loaded_example_app("en")
+    app = app.get("button_group")[0].set_value("Findings").run(timeout=10)
+    app = app.text_input[0].input("approval").run(timeout=10)
+    app = app.multiselect[0].select("policy").run(timeout=10)
+
+    assert any(message.value == "4 results out of 43" for message in app.markdown)
+    assert app.multiselect[0].value == ["policy"]
+    assert any(button.label == "Reset filters" for button in app.button)
+    assert any(button.label == "Download the current view" for button in app.download_button)
+
+
+def test_english_data_and_export_keep_canonical_data_and_export_contract() -> None:
+    app = loaded_example_app("en")
+    navigation = app.get("button_group")[0]
+
+    app = navigation.set_value("Data").run(timeout=10)
+    assert any(header.value == "Data" for header in app.subheader)
+    assert any(
+        message.value.startswith("id_spesa, data_spesa, dipendente") for message in app.markdown
+    )
+
+    navigation = app.get("button_group")[0]
+    app = navigation.set_value("Export").run(timeout=10)
+    assert any(header.value == "Export" for header in app.subheader)
+    download = next(
+        button
+        for button in app.get("download_button")
+        if button.label == "Download the current view"
+    )
+    assert download.key == "export_download"
+
+
+def test_english_download_label_does_not_change_filename_or_csv_content() -> None:
+    result = analyze_expenses(EXAMPLE_PATH)
+    expected = findings_to_csv(result.findings)
+
+    with (
+        patch("app.st.session_state", {"language": "en"}),
+        patch("app.st.download_button") as download_button,
+    ):
+        render_findings_download(result.findings, key="english_download")
+
+    download_button.assert_called_once_with(
+        "Download the current view",
+        data=expected,
+        file_name="expense_quality_findings.csv",
+        mime="text/csv",
+        type="primary",
+        key="english_download",
+    )
+
+
+def test_language_change_keeps_source_filters_and_stable_section() -> None:
+    app = loaded_example_app()
+    app = app.get("button_group")[0].set_value("findings").run(timeout=10)
+    app = app.text_input[0].input("policy").run(timeout=10)
+
+    app = app.sidebar.selectbox[0].set_value("English").run(timeout=10)
+
+    assert app.session_state["language"] == "en"
+    assert app.session_state["source_name"] == "synthetic_expenses.csv"
+    assert app.session_state["workspace_section"] == "findings"
+    assert app.session_state["finding_search"] == "policy"
+    assert app.get("button_group")[0].options == ["Overview", "Findings", "Data", "Export"]
+    assert any(header.value == "Findings" for header in app.subheader)
+
+    app = app.text_input[0].input("approval").run(timeout=10)
+
+    assert app.session_state["workspace_section"] == "findings"
+    assert any(header.value == "Findings" for header in app.subheader)
+    assert any(message.value == "4 results out of 43" for message in app.markdown)
+
+
+def test_findings_presentation_is_localized_without_changing_canonical_data() -> None:
+    result = analyze_expenses(EXAMPLE_PATH)
+    canonical = result.findings.copy(deep=True)
+
+    presented = findings_for_presentation(result.findings, "en")
+    policy = presented[presented["rule_id"].eq("POLICY_APPROVAL_REQUIRED")].iloc[0]
+
+    assert policy["anomaly_type"] == "policy"
+    assert policy["status"] == "requires approval"
+    assert policy["message"] == "requires approval"
+    pd.testing.assert_frame_equal(result.findings, canonical)
 
 
 def test_new_ui_copy_avoids_disallowed_marketing_and_directive_terms() -> None:
