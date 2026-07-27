@@ -5,6 +5,7 @@ from string import Formatter
 import pytest
 
 from expense_quality_monitor import i18n
+from expense_quality_monitor.config import RULE_CATALOG
 
 
 @pytest.mark.parametrize("locale", ["it", "it-IT", "it_IT", "IT-it"])
@@ -165,3 +166,54 @@ def test_profile_terms_have_explicit_equivalent_meanings(
 def test_catalog_builder_rejects_duplicate_keys() -> None:
     with pytest.raises(ValueError, match="Duplicate translation key: repeated"):
         i18n._build_catalog((("repeated", "first"), ("repeated", "second")))
+
+
+@pytest.mark.parametrize(
+    "key",
+    [
+        "nav.governance",
+        "governance.title",
+        "governance.description",
+        "governance.tab.metadata",
+        "governance.tab.rules",
+        "governance.tab.responsibilities",
+        "governance.metadata.source_name",
+        "governance.metadata.size",
+        "governance.metadata.analyzed_at",
+        "governance.metadata.sha256",
+        "governance.metadata.rows",
+        "governance.metadata.columns",
+        "governance.metadata.delimiter",
+        "governance.metadata.encoding",
+        "governance.metadata.bom",
+        "governance.metadata.extra_columns",
+        "governance.metadata.app_version",
+        "governance.rules.rule_id",
+        "governance.rules.name",
+        "governance.rules.description",
+        "governance.rules.type",
+        "governance.rules.dimension",
+        "governance.rules.status",
+        "governance.rules.fields",
+        "governance.rules.parameter",
+        "governance.rules.empty",
+        "governance.responsibility.owner",
+        "governance.responsibility.steward",
+        "governance.responsibility.organization",
+        "governance.responsibility.period",
+        "governance.responsibility.notes",
+        "governance.responsibility.notice",
+        "governance.responsibility.reset",
+    ],
+)
+def test_governance_copy_exists_in_both_languages(key: str) -> None:
+    assert i18n.translate(key, "it")
+    assert i18n.translate(key, "en")
+
+
+def test_all_canonical_rules_have_localized_names_and_descriptions() -> None:
+    for rule_id in RULE_CATALOG:
+        assert i18n.translate(f"rule.{rule_id}.name", "it")
+        assert i18n.translate(f"rule.{rule_id}.name", "en")
+        assert i18n.translate(f"rule.{rule_id}.message", "it")
+        assert i18n.translate(f"rule.{rule_id}.message", "en")

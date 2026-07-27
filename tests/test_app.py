@@ -1,5 +1,6 @@
 """Tests for the Streamlit product experience and UI-only transformations."""
 
+import hashlib
 from io import StringIO
 from pathlib import Path
 from types import SimpleNamespace
@@ -11,6 +12,8 @@ import pytest
 from streamlit.testing.v1 import AppTest
 
 from app import (
+    PROCESSING_METADATA_KEY,
+    SOURCE_IDENTITY_KEY,
     TEMPLATE_FILENAME,
     activate_example_source,
     activate_uploaded_source,
@@ -25,6 +28,7 @@ from app import (
     accessible_hero_svg,
     render_findings_download,
     reset_workspace_view,
+    set_active_source,
 )
 from expense_quality_monitor.config import EXPECTED_COLUMNS, FINDING_COLUMNS
 from expense_quality_monitor.pipeline import analyze_expenses
@@ -176,6 +180,7 @@ def test_example_source_keeps_confirmed_metrics_and_rule_count() -> None:
         "▦ Panoramica",
         "⚑ Segnalazioni",
         "◫ Profilo dati",
+        "◇ Governance",
         "▤ Dati",
         "⇩ Esporta",
     ]
@@ -678,6 +683,7 @@ def test_english_example_keeps_metrics_and_uses_stable_navigation_ids() -> None:
         "▦ Overview",
         "⚑ Findings",
         "◫ Data profile",
+        "◇ Governance",
         "▤ Data",
         "⇩ Export",
     ]
@@ -798,6 +804,7 @@ def test_language_change_keeps_source_filters_and_stable_section() -> None:
         "▦ Overview",
         "⚑ Findings",
         "◫ Data profile",
+        "◇ Governance",
         "▤ Data",
         "⇩ Export",
     ]
@@ -867,3 +874,234 @@ def test_counts_to_frame_preserves_columns_when_empty() -> None:
 
     assert result.empty
     assert result.columns.tolist() == ["Tipo di anomalia", "Conteggio"]
+
+
+def test_governance_navigation_metadata_and_catalog_are_complete_in_italian() -> None:
+    app = loaded_example_app()
+    app = app.get("button_group")[0].set_value("governance").run(timeout=10)
+
+    assert not app.exception
+    assert app.get("button_group")[0].value == "governance"
+    assert [tab.label for tab in app.tabs] == [
+        "Metadati",
+        "Catalogo delle regole",
+        "Responsabilità",
+    ]
+    assert [(metric.label, metric.value) for metric in app.metric] == [
+        ("Dimensione (byte)", "27572"),
+        ("Righe", "300"),
+        ("Colonne sorgente", "10"),
+        ("Colonne canoniche", "10"),
+    ]
+    expected_sha256 = hashlib.sha256(EXAMPLE_PATH.read_bytes()).hexdigest()
+    assert app.code[0].value == expected_sha256
+    assert len(app.code[0].value) == 64
+    assert set(app.code[0].value) <= set("0123456789abcdef")
+    assert app.dataframe[1].value.shape == (5, 4)
+    assert app.dataframe[2].value.shape == (17, 8)
+    assert [widget.label for widget in app.multiselect] == [
+        "Tipo di controllo",
+        "Dimensione",
+        "Stato",
+        "Campo",
+    ]
+    assert [widget.label for widget in app.text_input] == [
+        "Data owner",
+        "Data steward",
+        "Unità organizzativa",
+        "Periodo di riferimento",
+    ]
+    assert not app.warning
+
+
+def test_governance_filters_rule_catalog_without_changing_finding_filters() -> None:
+    app = loaded_example_app()
+    app = app.get("button_group")[0].set_value("governance").run(timeout=10)
+    dimension_filter = next(widget for widget in app.multiselect if widget.label == "Dimensione")
+
+    app = dimension_filter.select("validity").run(timeout=10)
+
+    catalog = app.dataframe[2].value
+    assert catalog.shape == (5, 8)
+    assert set(catalog["Dimensione"]) == {"Validità"}
+    assert app.session_state["filter_types"] == []
+    assert app.session_state["filter_statuses"] == []
+    assert app.session_state["filter_categories"] == []
+    assert app.session_state["filter_rules"] == []
+
+    status_filter = next(widget for widget in app.multiselect if widget.label == "Stato")
+    app = status_filter.select("non conforme").run(timeout=10)
+
+    assert app.dataframe[2].value.empty
+    assert any(
+        caption.value == "Nessuna regola corrisponde ai filtri selezionati."
+        for caption in app.caption
+    )
+
+
+def test_governance_language_change_preserves_section_timestamp_and_responsibilities() -> None:
+    app = loaded_example_app()
+    app = app.get("button_group")[0].set_value("governance").run(timeout=10)
+    timestamp = app.session_state[PROCESSING_METADATA_KEY].analyzed_at_utc
+    owner = next(widget for widget in app.text_input if widget.label == "Data owner")
+    app = owner.input("Responsabile locale").run(timeout=10)
+
+    app = app.sidebar.selectbox[0].set_value("English").run(timeout=10)
+
+    assert app.session_state["workspace_section"] == "governance"
+    assert app.get("button_group")[0].value == "governance"
+    assert app.session_state[PROCESSING_METADATA_KEY].analyzed_at_utc == timestamp
+    assert app.session_state["governance_owner"] == "Responsabile locale"
+    assert [tab.label for tab in app.tabs] == [
+        "Metadata",
+        "Rule catalog",
+        "Responsibilities",
+    ]
+    assert any(
+        "does not constitute an enterprise responsibility assignment system" in info.value
+        for info in app.info
+    )
+
+
+def test_governance_responsibilities_persist_across_section_changes() -> None:
+    app = loaded_example_app()
+    app = app.get("button_group")[0].set_value("governance").run(timeout=10)
+    timestamp = app.session_state[PROCESSING_METADATA_KEY].analyzed_at_utc
+    owner = next(widget for widget in app.text_input if widget.label == "Data owner")
+    app = owner.input("Responsabile locale").run(timeout=10)
+
+    app = app.get("button_group")[0].set_value("data").run(timeout=10)
+    app = app.get("button_group")[0].set_value("governance").run(timeout=10)
+
+    owner = next(widget for widget in app.text_input if widget.label == "Data owner")
+    assert owner.value == "Responsabile locale"
+    assert app.session_state["governance_owner"] == "Responsabile locale"
+    assert app.session_state[PROCESSING_METADATA_KEY].analyzed_at_utc == timestamp
+
+
+def test_governance_reset_clears_optional_responsibilities() -> None:
+    app = loaded_example_app()
+    app = app.get("button_group")[0].set_value("governance").run(timeout=10)
+    unsafe_owner = "<script>alert('test')</script> [link](https://example.invalid)"
+    long_notes = "nota " * 1000
+    owner = next(widget for widget in app.text_input if widget.label == "Data owner")
+    app = owner.input(unsafe_owner).run(timeout=10)
+    steward = next(widget for widget in app.text_input if widget.label == "Data steward")
+    app = steward.input("Steward locale").run(timeout=10)
+    notes = next(widget for widget in app.text_area if widget.label == "Note")
+    app = notes.input(long_notes).run(timeout=10)
+
+    assert app.session_state["governance_owner"] == unsafe_owner
+    assert app.session_state["governance_notes"] == long_notes
+    assert not any(unsafe_owner in message.value for message in app.markdown)
+
+    reset = next(button for button in app.button if button.label == "Azzera metadati inseriti")
+    app = reset.click().run(timeout=10)
+
+    assert app.session_state["governance_owner"] == ""
+    assert app.session_state["governance_steward"] == ""
+    assert app.session_state["governance_notes"] == ""
+    assert app.session_state[PROCESSING_METADATA_KEY].row_count == 300
+
+    reset = next(button for button in app.button if button.label == "Azzera metadati inseriti")
+    app = reset.click().run(timeout=10)
+    assert app.session_state["governance_owner"] == ""
+
+
+def test_reselecting_the_same_source_preserves_source_bound_governance_state() -> None:
+    content = b"a,b\n1,2\n"
+    metadata = object()
+    session_state = {
+        SOURCE_IDENTITY_KEY: ("stesso.csv", content),
+        PROCESSING_METADATA_KEY: metadata,
+        "governance_owner": "Responsabile locale",
+        "governance_steward": "Steward locale",
+        "governance_filter_types": ["validità"],
+    }
+    with patch("app.st.session_state", session_state):
+        set_active_source(name="stesso.csv", content=content, is_example=False)
+
+    assert session_state[PROCESSING_METADATA_KEY] is metadata
+    assert session_state["governance_owner"] == "Responsabile locale"
+    assert session_state["governance_steward"] == "Steward locale"
+    assert session_state["governance_filter_types"] == ["validità"]
+
+
+@pytest.mark.parametrize(
+    ("name", "content"),
+    [
+        ("stesso.csv", b"a,b\n3,4\n"),
+        ("rinominato.csv", b"a,b\n1,2\n"),
+    ],
+)
+def test_changing_source_name_or_bytes_clears_source_bound_governance_state(
+    name: str,
+    content: bytes,
+) -> None:
+    session_state = {
+        SOURCE_IDENTITY_KEY: ("stesso.csv", b"a,b\n1,2\n"),
+        PROCESSING_METADATA_KEY: object(),
+        "governance_owner": "Responsabile locale",
+        "governance_steward": "Steward locale",
+        "governance_filter_types": ["validità"],
+    }
+    with patch("app.st.session_state", session_state):
+        set_active_source(name=name, content=content, is_example=False)
+
+    assert PROCESSING_METADATA_KEY not in session_state
+    assert "governance_owner" not in session_state
+    assert "governance_steward" not in session_state
+    assert "governance_filter_types" not in session_state
+    assert session_state["source_name"] == name
+    assert session_state[SOURCE_IDENTITY_KEY] == (name, content)
+
+
+def test_incompatible_changed_source_clears_governance_without_creating_metadata() -> None:
+    app = loaded_example_app()
+    app.session_state["governance_owner"] = "Responsabile locale"
+    app.session_state["source_name"] = "incompatibile.csv"
+    app.session_state["source_bytes"] = b"a,b\n1,2\n"
+    app.session_state["source_is_example"] = False
+
+    app = app.run(timeout=10)
+
+    assert PROCESSING_METADATA_KEY not in app.session_state
+    assert "governance_owner" not in app.session_state
+    assert app.warning[0].value == "Questo CSV non corrisponde alla struttura delle spese"
+
+
+def test_governance_responsibilities_do_not_change_findings_export() -> None:
+    expected = findings_to_csv(analyze_expenses(EXAMPLE_PATH).findings)
+    findings = analyze_expenses(EXAMPLE_PATH).findings
+    with (
+        patch("app.st.session_state", {"governance_owner": "Responsabile locale"}),
+        patch("app.st.download_button") as download_button,
+    ):
+        render_findings_download(findings, key="governance_export_invariance")
+
+    assert download_button.call_args.kwargs["data"] == expected
+    assert "Responsabile locale" not in download_button.call_args.kwargs["data"]
+
+
+def test_governance_reports_bom_semicolon_and_extra_columns_for_an_upload() -> None:
+    source = pd.read_csv(StringIO(one_expense_csv().decode()), dtype=str)
+    source["nota_locale"] = "valore"
+    content = source.to_csv(index=False, sep=";").encode("utf-8-sig")
+    app = app_with_uploaded_bytes("spese-extra.csv", content)
+
+    app = app.get("button_group")[0].set_value("governance").run(timeout=10)
+
+    metadata = app.session_state[PROCESSING_METADATA_KEY]
+    assert metadata.source_name == "spese-extra.csv"
+    assert metadata.source_size_bytes == len(content)
+    assert metadata.delimiter == ";"
+    assert metadata.encoding == "utf-8"
+    assert metadata.has_bom is True
+    assert metadata.extra_columns == ("nota_locale",)
+    assert metadata.row_count == 1
+    assert metadata.source_column_count == 11
+    assert metadata.canonical_column_count == 10
+    details = app.dataframe[0].value
+    assert "UTF-8 con BOM" in details["Valore"].tolist()
+    assert "Sì" in details["Valore"].tolist()
+    assert "nota_locale" in details["Valore"].tolist()

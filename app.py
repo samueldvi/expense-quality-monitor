@@ -6,6 +6,7 @@ import csv
 import html
 import logging
 from collections.abc import Callable, Mapping, Sequence
+from datetime import UTC, datetime
 from io import BytesIO, StringIO
 from pathlib import Path
 from typing import cast
@@ -16,6 +17,14 @@ import streamlit as st
 
 from expense_quality_monitor import i18n
 from expense_quality_monitor.config import EXPECTED_COLUMNS, FINDING_COLUMNS
+from expense_quality_monitor.governance import (
+    ProcessingMetadata,
+    application_version,
+    build_dimension_summary,
+    build_processing_metadata,
+    build_rule_catalog,
+    filter_rule_catalog,
+)
 from expense_quality_monitor.loader import (
     CSV_ERROR_DUPLICATE_COLUMNS,
     CSV_ERROR_EMPTY,
@@ -24,6 +33,7 @@ from expense_quality_monitor.loader import (
     CsvLoadError,
     SchemaComparison,
     compare_schema,
+    inspect_csv_source,
 )
 from expense_quality_monitor.pipeline import AnalysisResult, analyze_expenses
 from expense_quality_monitor.profiling import (
@@ -48,9 +58,10 @@ HERO_PATH = ROOT / "docs" / "assets" / "dashboard-hero.svg"
 TEMPLATE_FILENAME = "expense_quality_monitor_template.csv"
 FINDINGS_FILENAME = "expense_quality_findings.csv"
 CSV_MIME_TYPE = "text/csv"
-SECTION_IDS = ("overview", "findings", "profile", "data", "export")
+SECTION_IDS = ("overview", "findings", "profile", "governance", "data", "export")
 DEFAULT_SECTION = SECTION_IDS[0]
 SECTION_WIDGET_KEY = "workspace_section_widget"
+SOURCE_IDENTITY_KEY = "source_identity"
 FILTER_KEYS = (
     "finding_search",
     "filter_types",
@@ -58,6 +69,31 @@ FILTER_KEYS = (
     "filter_categories",
     "filter_rules",
 )
+GOVERNANCE_FILTER_KEYS = (
+    "governance_filter_types",
+    "governance_filter_dimensions",
+    "governance_filter_statuses",
+    "governance_filter_fields",
+)
+GOVERNANCE_RULE_PRESENTATION_COLUMNS = (
+    "rule_id",
+    "name",
+    "description",
+    "anomaly_type",
+    "dimension",
+    "status",
+    "fields",
+    "parameters",
+)
+RESPONSIBILITY_KEYS = (
+    "governance_owner",
+    "governance_steward",
+    "governance_organization",
+    "governance_period",
+    "governance_notes",
+)
+RESPONSIBILITY_WIDGET_KEYS = tuple(f"_{key}_widget" for key in RESPONSIBILITY_KEYS)
+PROCESSING_METADATA_KEY = "processing_metadata"
 TABLE_COLUMNS = (
     "source_row_number",
     "id_spesa",
@@ -104,6 +140,7 @@ SECTION_ICONS = {
     "overview": "▦",
     "findings": "⚑",
     "profile": "◫",
+    "governance": "◇",
     "data": "▤",
     "export": "⇩",
 }
@@ -294,6 +331,27 @@ def reset_workspace_view() -> None:
     reset_filters()
 
 
+def reset_governance_state() -> None:
+    """Discard source-bound metadata and optional local responsibilities."""
+    st.session_state.pop(PROCESSING_METADATA_KEY, None)
+    for key in RESPONSIBILITY_KEYS:
+        st.session_state.pop(key, None)
+    for key in RESPONSIBILITY_WIDGET_KEYS:
+        st.session_state.pop(key, None)
+    for key in GOVERNANCE_FILTER_KEYS:
+        st.session_state.pop(key, None)
+
+
+def synchronize_source_identity(name: str, content: bytes) -> bool:
+    """Reset source-bound state only when name or exact bytes change."""
+    identity = (name, content)
+    if st.session_state.get(SOURCE_IDENTITY_KEY) == identity:
+        return False
+    reset_governance_state()
+    st.session_state[SOURCE_IDENTITY_KEY] = identity
+    return True
+
+
 def set_active_source(
     *,
     name: str,
@@ -301,6 +359,10 @@ def set_active_source(
     is_example: bool,
 ) -> None:
     """Store one active source without rendering or reading external data."""
+    identity_content = EXAMPLE_PATH.read_bytes() if is_example else content
+    if identity_content is None:
+        raise ValueError("An uploaded source requires byte content")
+    synchronize_source_identity(name, identity_content)
     st.session_state["source_name"] = name
     st.session_state["source_bytes"] = content
     st.session_state["source_is_example"] = is_example
@@ -345,6 +407,14 @@ def current_source() -> Path | BytesIO | None:
     if source_bytes is None:
         return None
     return BytesIO(source_bytes)
+
+
+def current_source_bytes() -> bytes | None:
+    """Return the exact original bytes for the active source."""
+    if st.session_state.get("source_is_example"):
+        return EXAMPLE_PATH.read_bytes()
+    source_bytes = st.session_state.get("source_bytes")
+    return source_bytes if isinstance(source_bytes, bytes) else None
 
 
 def friendly_load_error(error: CsvLoadError) -> str:
@@ -1004,6 +1074,283 @@ def render_profile(result: AnalysisResult) -> None:
         _render_data_dictionary(dictionary, language)
 
 
+def clear_governance_responsibilities() -> None:
+    """Clear only optional responsibility fields for the active source."""
+    for key in RESPONSIBILITY_KEYS:
+        st.session_state[key] = ""
+    for key in RESPONSIBILITY_WIDGET_KEYS:
+        st.session_state[key] = ""
+
+
+def persist_governance_responsibility(value_key: str, widget_key: str) -> None:
+    """Copy one temporary widget value to source-bound session state."""
+    st.session_state[value_key] = st.session_state[widget_key]
+
+
+def initialize_governance_responsibility_widgets() -> None:
+    """Restore temporary widget keys from persistent session values."""
+    for value_key, widget_key in zip(
+        RESPONSIBILITY_KEYS,
+        RESPONSIBILITY_WIDGET_KEYS,
+        strict=True,
+    ):
+        if widget_key not in st.session_state:
+            st.session_state[widget_key] = st.session_state.get(value_key, "")
+
+
+def _localized_rule_parameter(
+    parameter_kind: object,
+    parameter_value: object,
+    language: str,
+) -> str:
+    """Return a localized presentation of one confirmed rule parameter."""
+    if not isinstance(parameter_kind, str):
+        return i18n.translate("common.not_applicable", language)
+    if parameter_kind == "logical_duplicate_fields":
+        fields = ", ".join(cast(tuple[str, ...], parameter_value))
+        return i18n.translate("governance.parameter.fields", language, values=fields)
+    if parameter_kind == "median_multiplier":
+        return i18n.translate(
+            "governance.parameter.multiplier",
+            language,
+            value=parameter_value,
+        )
+    if parameter_kind == "minimum_observations":
+        return i18n.translate(
+            "governance.parameter.minimum_observations",
+            language,
+            value=parameter_value,
+        )
+    thresholds = ", ".join(
+        f"{category}: {amount} EUR"
+        for category, amount in cast(tuple[tuple[str, object], ...], parameter_value)
+    )
+    return i18n.translate(
+        "governance.parameter.policy_thresholds",
+        language,
+        values=thresholds,
+    )
+
+
+def _localized_rule_catalog(catalog: pd.DataFrame, language: str) -> pd.DataFrame:
+    """Return a localized presentation copy of the canonical rule catalog."""
+    rows = []
+    for _, rule in catalog.iterrows():
+        rows.append(
+            {
+                "rule_id": rule["rule_id"],
+                "name": i18n.translate(rule["name_key"], language),
+                "description": i18n.translate(rule["description_key"], language),
+                "anomaly_type": localized_value(
+                    rule["anomaly_type"],
+                    ANOMALY_TYPE_KEYS,
+                    language,
+                ),
+                "dimension": i18n.translate(f"dimension.{rule['dimension']}", language),
+                "status": localized_value(rule["status"], STATUS_KEYS, language),
+                "fields": ", ".join(rule["fields"]),
+                "parameters": _localized_rule_parameter(
+                    rule["parameter_kind"],
+                    rule["parameter_value"],
+                    language,
+                ),
+            }
+        )
+    return pd.DataFrame(rows, columns=GOVERNANCE_RULE_PRESENTATION_COLUMNS)
+
+
+def _render_processing_metadata(metadata: ProcessingMetadata) -> None:
+    """Render immutable source and processing facts."""
+    st.write(tr("governance.metadata.description"))
+    metrics = st.columns(4)
+    metrics[0].metric(tr("governance.metadata.size"), metadata.source_size_bytes)
+    metrics[1].metric(tr("governance.metadata.rows"), metadata.row_count)
+    metrics[2].metric(tr("governance.metadata.columns"), metadata.source_column_count)
+    metrics[3].metric(
+        tr("governance.metadata.canonical_columns"),
+        metadata.canonical_column_count,
+    )
+    details = pd.DataFrame(
+        [
+            (tr("governance.metadata.source_name"), metadata.source_name),
+            (
+                tr("governance.metadata.analyzed_at"),
+                metadata.analyzed_at_utc.isoformat(timespec="seconds"),
+            ),
+            (tr("governance.metadata.delimiter"), metadata.delimiter),
+            (
+                tr("governance.metadata.encoding"),
+                tr(
+                    "governance.encoding.utf8_bom"
+                    if metadata.has_bom
+                    else "governance.encoding.utf8"
+                ),
+            ),
+            (
+                tr("governance.metadata.bom"),
+                tr("common.yes" if metadata.has_bom else "common.no"),
+            ),
+            (
+                tr("governance.metadata.extra_columns"),
+                ", ".join(metadata.extra_columns) or tr("common.none"),
+            ),
+            (
+                tr("governance.metadata.app_version"),
+                metadata.application_version or tr("common.not_available"),
+            ),
+        ],
+        columns=(tr("governance.metadata.property"), tr("governance.metadata.value")),
+    )
+    st.dataframe(details, hide_index=True, width="stretch")
+    st.caption(tr("governance.metadata.sha256"))
+    st.code(metadata.sha256, language=None)
+
+
+def _render_rule_catalog(
+    findings: pd.DataFrame,
+    source_row_numbers: Sequence[object],
+) -> None:
+    """Render canonical rules, independent filters, and observed dimension counts."""
+    language = current_language()
+    catalog = build_rule_catalog()
+    summary = build_dimension_summary(
+        catalog,
+        findings,
+        source_row_numbers,
+    ).copy()
+    summary["dimension"] = summary["dimension"].map(
+        lambda value: i18n.translate(f"dimension.{value}", language)
+    )
+    summary.columns = (
+        tr("governance.dimension.name"),
+        tr("governance.dimension.rule_count"),
+        tr("governance.dimension.finding_count"),
+        tr("governance.dimension.row_count"),
+    )
+    st.subheader(tr("governance.dimension.title"))
+    st.dataframe(summary, hide_index=True, width="stretch")
+
+    filter_columns = st.columns(4)
+    with filter_columns[0]:
+        st.multiselect(
+            tr("governance.filter.type"),
+            sorted(catalog["anomaly_type"].unique()),
+            key=GOVERNANCE_FILTER_KEYS[0],
+            format_func=lambda value: localized_value(value, ANOMALY_TYPE_KEYS, language),
+        )
+    with filter_columns[1]:
+        st.multiselect(
+            tr("governance.filter.dimension"),
+            list(dict.fromkeys(catalog["dimension"])),
+            key=GOVERNANCE_FILTER_KEYS[1],
+            format_func=lambda value: i18n.translate(f"dimension.{value}", language),
+        )
+    with filter_columns[2]:
+        st.multiselect(
+            tr("governance.filter.status"),
+            sorted(catalog["status"].unique()),
+            key=GOVERNANCE_FILTER_KEYS[2],
+            format_func=lambda value: localized_value(value, STATUS_KEYS, language),
+        )
+    with filter_columns[3]:
+        fields = sorted({field for values in catalog["fields"] for field in values})
+        st.multiselect(
+            tr("governance.filter.field"),
+            fields,
+            key=GOVERNANCE_FILTER_KEYS[3],
+        )
+    filtered = filter_rule_catalog(
+        catalog,
+        anomaly_types=st.session_state.get(GOVERNANCE_FILTER_KEYS[0], ()),
+        dimensions=st.session_state.get(GOVERNANCE_FILTER_KEYS[1], ()),
+        statuses=st.session_state.get(GOVERNANCE_FILTER_KEYS[2], ()),
+        fields=st.session_state.get(GOVERNANCE_FILTER_KEYS[3], ()),
+    )
+    presented = _localized_rule_catalog(filtered, language)
+    presented.columns = (
+        tr("governance.rules.rule_id"),
+        tr("governance.rules.name"),
+        tr("governance.rules.description"),
+        tr("governance.rules.type"),
+        tr("governance.rules.dimension"),
+        tr("governance.rules.status"),
+        tr("governance.rules.fields"),
+        tr("governance.rules.parameter"),
+    )
+    if presented.empty:
+        st.caption(tr("governance.rules.empty"))
+    st.dataframe(presented, hide_index=True, width="stretch")
+
+
+def _render_responsibilities() -> None:
+    """Render optional, session-local responsibility notes."""
+    initialize_governance_responsibility_widgets()
+    st.info(tr("governance.responsibility.notice"), icon=":material/info:")
+    first_row = st.columns(2)
+    with first_row[0]:
+        st.text_input(
+            tr("governance.responsibility.owner"),
+            key=RESPONSIBILITY_WIDGET_KEYS[0],
+            on_change=persist_governance_responsibility,
+            args=(RESPONSIBILITY_KEYS[0], RESPONSIBILITY_WIDGET_KEYS[0]),
+        )
+    with first_row[1]:
+        st.text_input(
+            tr("governance.responsibility.steward"),
+            key=RESPONSIBILITY_WIDGET_KEYS[1],
+            on_change=persist_governance_responsibility,
+            args=(RESPONSIBILITY_KEYS[1], RESPONSIBILITY_WIDGET_KEYS[1]),
+        )
+    second_row = st.columns(2)
+    with second_row[0]:
+        st.text_input(
+            tr("governance.responsibility.organization"),
+            key=RESPONSIBILITY_WIDGET_KEYS[2],
+            on_change=persist_governance_responsibility,
+            args=(RESPONSIBILITY_KEYS[2], RESPONSIBILITY_WIDGET_KEYS[2]),
+        )
+    with second_row[1]:
+        st.text_input(
+            tr("governance.responsibility.period"),
+            key=RESPONSIBILITY_WIDGET_KEYS[3],
+            on_change=persist_governance_responsibility,
+            args=(RESPONSIBILITY_KEYS[3], RESPONSIBILITY_WIDGET_KEYS[3]),
+        )
+    st.text_area(
+        tr("governance.responsibility.notes"),
+        key=RESPONSIBILITY_WIDGET_KEYS[4],
+        on_change=persist_governance_responsibility,
+        args=(RESPONSIBILITY_KEYS[4], RESPONSIBILITY_WIDGET_KEYS[4]),
+    )
+    st.button(
+        tr("governance.responsibility.reset"),
+        on_click=clear_governance_responsibilities,
+        icon=":material/delete_sweep:",
+    )
+
+
+def render_governance(result: AnalysisResult, metadata: ProcessingMetadata) -> None:
+    """Render local governance facts without changing analysis outputs."""
+    st.subheader(f"{SECTION_ICONS['governance']} {tr('governance.title')}")
+    st.write(tr("governance.description"))
+    metadata_tab, rules_tab, responsibilities_tab = st.tabs(
+        (
+            tr("governance.tab.metadata"),
+            tr("governance.tab.rules"),
+            tr("governance.tab.responsibilities"),
+        )
+    )
+    with metadata_tab:
+        _render_processing_metadata(metadata)
+    with rules_tab:
+        _render_rule_catalog(
+            result.findings,
+            result.source_data[SOURCE_ROW_COLUMN],
+        )
+    with responsibilities_tab:
+        _render_responsibilities()
+
+
 def render_export(filtered: pd.DataFrame, language: str) -> None:
     """Render export facts and download the current filtered schema."""
     st.subheader(f"{SECTION_ICONS['export']} {tr('export.title')}")
@@ -1021,12 +1368,25 @@ def render_export(filtered: pd.DataFrame, language: str) -> None:
 
 def analyze_current_source() -> AnalysisResult | None:
     """Analyze the active session source and show concise load errors."""
-    source = current_source()
-    if source is None:
+    content = current_source_bytes()
+    if content is None:
         return None
+    source_name = cast(str, st.session_state["source_name"])
+    synchronize_source_identity(source_name, content)
     try:
         with st.spinner(tr("analysis.running")):
-            return analyze_expenses(source)
+            result = analyze_expenses(BytesIO(content))
+        if PROCESSING_METADATA_KEY not in st.session_state:
+            profile = build_data_profile(result.source_data, result.findings)
+            st.session_state[PROCESSING_METADATA_KEY] = build_processing_metadata(
+                source_name=source_name,
+                content=content,
+                profile=profile,
+                csv_format=inspect_csv_source(BytesIO(content)),
+                analyzed_at_utc=datetime.now(UTC),
+                installed_version=application_version(),
+            )
+        return result
     except CsvLoadError as error:
         if error.code == CSV_ERROR_INCOMPATIBLE_SCHEMA and error.schema is not None:
             render_schema_guidance(error.schema)
@@ -1099,6 +1459,11 @@ def render_dashboard() -> None:
         render_findings(result, enriched_findings)
     elif section == "profile":
         render_profile(result)
+    elif section == "governance":
+        render_governance(
+            result,
+            cast(ProcessingMetadata, st.session_state[PROCESSING_METADATA_KEY]),
+        )
     elif section == "data":
         render_data(result, source_name)
     elif section == "export":
