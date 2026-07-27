@@ -4,6 +4,7 @@ from io import StringIO
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
+from xml.etree import ElementTree
 
 import pandas as pd
 import pytest
@@ -21,6 +22,7 @@ from app import (
     findings_for_presentation,
     findings_with_categories,
     initialize_language,
+    accessible_hero_svg,
     render_findings_download,
     reset_workspace_view,
 )
@@ -30,6 +32,7 @@ from expense_quality_monitor.reporting import findings_to_csv
 
 ROOT = Path(__file__).resolve().parents[1]
 EXAMPLE_PATH = ROOT / "data" / "synthetic_expenses.csv"
+HERO_PATH = ROOT / "docs" / "assets" / "dashboard-hero.svg"
 
 
 def loaded_example_app(language: str = "it") -> AppTest:
@@ -73,6 +76,29 @@ def test_initial_state_offers_equal_starting_paths_and_main_copy() -> None:
         for caption in app.caption
     )
     assert not app.warning
+
+
+def test_initial_hero_uses_local_text_free_svg_and_localized_description() -> None:
+    app = AppTest.from_file(ROOT / "app.py").run()
+    svg_root = ElementTree.parse(HERO_PATH).getroot()
+    accessible_svg = accessible_hero_svg(
+        "Illustrazione astratta di una tabella verificata da controlli di qualità"
+    )
+
+    assert HERO_PATH.is_file()
+    assert svg_root.tag.endswith("svg")
+    assert not any(element.tag.endswith("text") for element in svg_root.iter())
+    assert '<img src="data:image/svg+xml,' in accessible_svg
+    assert "base64" not in accessible_svg
+    assert (
+        'alt="Illustrazione astratta di una tabella verificata da controlli di qualità"'
+        in accessible_svg
+    )
+    assert any(
+        caption.value == "✓ Controlli deterministici, nessuna AI nel runtime"
+        for caption in app.caption
+    )
+    assert any(button.label == "Scarica il modello CSV" for button in app.download_button)
 
 
 def test_language_initialization_uses_locale_once_and_preserves_explicit_choice() -> None:
@@ -123,18 +149,25 @@ def test_example_source_keeps_confirmed_metrics_and_rule_count() -> None:
     assert not app.exception
     assert [(metric.label, metric.value) for metric in app.metric] == [
         ("Righe", "300"),
-        ("Righe da verificare", "37"),
+        ("⚠ Righe da verificare", "37"),
         ("Segnalazioni", "43"),
         ("Regole coinvolte", "17"),
     ]
     navigation = app.get("button_group")[0]
-    assert navigation.options == ["Panoramica", "Segnalazioni", "Dati", "Esporta"]
+    assert navigation.options == [
+        "▦ Panoramica",
+        "⚑ Segnalazioni",
+        "▤ Dati",
+        "⇩ Esporta",
+    ]
     assert navigation.value == "overview"
     assert app.sidebar.get("file_uploader")[0].label == "Scegli un altro CSV"
     assert any(
-        caption.value == "synthetic_expenses.csv · 300 righe · Analisi completata"
-        for caption in app.caption
+        message.value
+        == ":blue-background[ℹ File di esempio] :green-background[✓ Analisi completata]"
+        for message in app.markdown
     )
+    assert any(message.value == "📄 synthetic_expenses.csv" for message in app.text)
 
 
 def test_incompatible_schema_shows_real_columns_and_available_actions() -> None:
@@ -159,7 +192,7 @@ def test_incompatible_schema_shows_real_columns_and_available_actions() -> None:
     )
     assert any(button.label == "Prova con l’esempio" for button in app.button)
     assert any(caption.value == "File selezionato" for caption in app.sidebar.caption)
-    assert any(message.value == "Iris.csv" for message in app.sidebar.markdown)
+    assert any(message.value == "Iris.csv" for message in app.sidebar.text)
     assert not app.get("button_group")
 
 
@@ -193,7 +226,7 @@ def test_load_failures_use_specific_non_accusatory_messages(
 
     assert not app.exception
     assert app.warning[0].value == expected_message
-    assert any(message.value == name for message in app.sidebar.markdown)
+    assert any(message.value == name for message in app.sidebar.text)
 
 
 def test_example_action_from_schema_guidance_keeps_confirmed_metrics() -> None:
@@ -204,7 +237,7 @@ def test_example_action_from_schema_guidance_keeps_confirmed_metrics() -> None:
 
     assert [(metric.label, metric.value) for metric in app.metric] == [
         ("Righe", "300"),
-        ("Righe da verificare", "37"),
+        ("⚠ Righe da verificare", "37"),
         ("Segnalazioni", "43"),
         ("Regole coinvolte", "17"),
     ]
@@ -232,7 +265,7 @@ def test_compatible_example_with_extra_columns_keeps_metrics_and_shows_note() ->
     assert not app.exception
     assert [(metric.label, metric.value) for metric in app.metric] == [
         ("Righe", "300"),
-        ("Righe da verificare", "37"),
+        ("⚠ Righe da verificare", "37"),
         ("Segnalazioni", "43"),
         ("Regole coinvolte", "17"),
     ]
@@ -240,6 +273,17 @@ def test_compatible_example_with_extra_columns_keeps_metrics_and_shows_note() ->
         "Il file contiene 2 colonne aggiuntive che non vengono utilizzate nell’analisi."
     )
     assert not app.warning
+
+
+def test_uploaded_filename_is_rendered_as_plain_text() -> None:
+    source = EXAMPLE_PATH.read_bytes()
+    filename = "[spese](https://example.invalid).csv"
+
+    app = app_with_uploaded_bytes(filename, source)
+
+    assert not app.exception
+    assert any(message.value == f"📄 {filename}" for message in app.text)
+    assert any(message.value == filename for message in app.sidebar.text)
 
 
 def test_semicolon_upload_is_accepted_by_the_existing_workspace() -> None:
@@ -251,7 +295,7 @@ def test_semicolon_upload_is_accepted_by_the_existing_workspace() -> None:
     assert not app.exception
     assert [(metric.label, metric.value) for metric in app.metric] == [
         ("Righe", "300"),
-        ("Righe da verificare", "37"),
+        ("⚠ Righe da verificare", "37"),
         ("Segnalazioni", "43"),
         ("Regole coinvolte", "17"),
     ]
@@ -343,7 +387,7 @@ def test_invalid_navigation_state_returns_to_the_stable_default() -> None:
     assert app.session_state["workspace_section"] == "overview"
     assert app.session_state["workspace_section_widget"] == "overview"
     assert app.get("button_group")[0].value == "overview"
-    assert any(header.value == "Categorie" for header in app.subheader)
+    assert any(header.value == "▦ Categorie" for header in app.subheader)
 
 
 def test_upload_and_example_store_the_same_source_keys() -> None:
@@ -405,6 +449,7 @@ def test_findings_download_preserves_public_csv_contract() -> None:
         file_name="expense_quality_findings.csv",
         mime="text/csv",
         type="primary",
+        icon=":material/download:",
         key="test_download",
     )
 
@@ -414,14 +459,14 @@ def test_data_and_export_sections_present_factual_context() -> None:
     navigation = app.get("button_group")[0]
 
     app = navigation.set_value("data").run(timeout=10)
-    assert any(header.value == "Dati" for header in app.subheader)
+    assert any(header.value == "▤ Dati" for header in app.subheader)
     assert any(
         "Qui puoi controllare il contenuto ricevuto" in message.value for message in app.markdown
     )
 
     navigation = app.get("button_group")[0]
     app = navigation.set_value("export").run(timeout=10)
-    assert any(header.value == "Esporta" for header in app.subheader)
+    assert any(header.value == "⇩ Esporta" for header in app.subheader)
     assert any(button.label == "Scarica la vista corrente" for button in app.get("download_button"))
 
 
@@ -440,9 +485,16 @@ def test_english_initial_state_and_language_selector_use_explicit_copy() -> None
     assert app.main.get("file_uploader")[0].label == "Choose a CSV"
     assert any(button.label == "Try the example" for button in app.button)
     language_selector = app.sidebar.selectbox[0]
-    assert language_selector.label == "Language"
+    assert language_selector.label == "🌐 Language"
     assert language_selector.options == ["Italiano", "English"]
     assert language_selector.value == "en"
+    assert (
+        'alt="Abstract illustration of a table verified by quality checks"'
+        in accessible_hero_svg("Abstract illustration of a table verified by quality checks")
+    )
+    assert any(
+        caption.value == "✓ Deterministic checks, no AI at runtime" for caption in app.caption
+    )
 
 
 def test_english_example_keeps_metrics_and_uses_stable_navigation_ids() -> None:
@@ -451,17 +503,23 @@ def test_english_example_keeps_metrics_and_uses_stable_navigation_ids() -> None:
     assert not app.exception
     assert [(metric.label, metric.value) for metric in app.metric] == [
         ("Rows", "300"),
-        ("Rows to review", "37"),
+        ("⚠ Rows to review", "37"),
         ("Findings", "43"),
         ("Rules involved", "17"),
     ]
     navigation = app.get("button_group")[0]
-    assert navigation.options == ["Overview", "Findings", "Data", "Export"]
+    assert navigation.options == [
+        "▦ Overview",
+        "⚑ Findings",
+        "▤ Data",
+        "⇩ Export",
+    ]
     assert navigation.value == "overview"
     assert any(
-        caption.value == "synthetic_expenses.csv · 300 rows · Analysis complete"
-        for caption in app.caption
+        message.value == ":blue-background[ℹ Example file] :green-background[✓ Analysis complete]"
+        for message in app.markdown
     )
+    assert any(message.value == "📄 synthetic_expenses.csv" for message in app.text)
 
 
 def test_english_schema_guidance_translates_copy_but_not_column_names() -> None:
@@ -498,7 +556,7 @@ def test_english_extra_column_message_keeps_confirmed_metrics() -> None:
     )
     assert [(metric.label, metric.value) for metric in app.metric] == [
         ("Rows", "300"),
-        ("Rows to review", "37"),
+        ("⚠ Rows to review", "37"),
         ("Findings", "43"),
         ("Rules involved", "17"),
     ]
@@ -506,7 +564,7 @@ def test_english_extra_column_message_keeps_confirmed_metrics() -> None:
 
 def test_english_search_filters_localized_messages_with_canonical_values() -> None:
     app = loaded_example_app("en")
-    app = app.get("button_group")[0].set_value("Findings").run(timeout=10)
+    app = app.get("button_group")[0].set_value("⚑ Findings").run(timeout=10)
     app = app.text_input[0].input("approval").run(timeout=10)
     app = app.multiselect[0].select("policy").run(timeout=10)
 
@@ -520,15 +578,15 @@ def test_english_data_and_export_keep_canonical_data_and_export_contract() -> No
     app = loaded_example_app("en")
     navigation = app.get("button_group")[0]
 
-    app = navigation.set_value("Data").run(timeout=10)
-    assert any(header.value == "Data" for header in app.subheader)
+    app = navigation.set_value("▤ Data").run(timeout=10)
+    assert any(header.value == "▤ Data" for header in app.subheader)
     assert any(
         message.value.startswith("id_spesa, data_spesa, dipendente") for message in app.markdown
     )
 
     navigation = app.get("button_group")[0]
-    app = navigation.set_value("Export").run(timeout=10)
-    assert any(header.value == "Export" for header in app.subheader)
+    app = navigation.set_value("⇩ Export").run(timeout=10)
+    assert any(header.value == "⇩ Export" for header in app.subheader)
     download = next(
         button
         for button in app.get("download_button")
@@ -553,6 +611,7 @@ def test_english_download_label_does_not_change_filename_or_csv_content() -> Non
         file_name="expense_quality_findings.csv",
         mime="text/csv",
         type="primary",
+        icon=":material/download:",
         key="english_download",
     )
 
@@ -568,13 +627,18 @@ def test_language_change_keeps_source_filters_and_stable_section() -> None:
     assert app.session_state["source_name"] == "synthetic_expenses.csv"
     assert app.session_state["workspace_section"] == "findings"
     assert app.session_state["finding_search"] == "policy"
-    assert app.get("button_group")[0].options == ["Overview", "Findings", "Data", "Export"]
-    assert any(header.value == "Findings" for header in app.subheader)
+    assert app.get("button_group")[0].options == [
+        "▦ Overview",
+        "⚑ Findings",
+        "▤ Data",
+        "⇩ Export",
+    ]
+    assert any(header.value == "⚑ Findings" for header in app.subheader)
 
     app = app.text_input[0].input("approval").run(timeout=10)
 
     assert app.session_state["workspace_section"] == "findings"
-    assert any(header.value == "Findings" for header in app.subheader)
+    assert any(header.value == "⚑ Findings" for header in app.subheader)
     assert any(message.value == "4 results out of 43" for message in app.markdown)
 
 
@@ -586,9 +650,22 @@ def test_findings_presentation_is_localized_without_changing_canonical_data() ->
     policy = presented[presented["rule_id"].eq("POLICY_APPROVAL_REQUIRED")].iloc[0]
 
     assert policy["anomaly_type"] == "policy"
-    assert policy["status"] == "requires approval"
+    assert policy["status"] == "⚠ requires approval"
     assert policy["message"] == "requires approval"
     pd.testing.assert_frame_equal(result.findings, canonical)
+
+
+def test_empty_filtered_view_uses_success_copy_and_reset_guidance() -> None:
+    app = loaded_example_app()
+    app = app.get("button_group")[0].set_value("findings").run(timeout=10)
+    app = app.text_input[0].input("nessun-risultato-possibile").run(timeout=10)
+
+    assert app.success[0].value == "Nessuna segnalazione nella vista corrente."
+    assert any(
+        caption.value == "Modifica la ricerca oppure ripristina i filtri per ampliare la vista."
+        for caption in app.caption
+    )
+    assert any(button.label == "Ripristina filtri" for button in app.button)
 
 
 def test_new_ui_copy_avoids_disallowed_marketing_and_directive_terms() -> None:

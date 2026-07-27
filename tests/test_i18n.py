@@ -82,6 +82,21 @@ def test_catalogs_have_no_empty_values() -> None:
     assert all(i18n.ENGLISH_TRANSLATIONS.values())
 
 
+@pytest.mark.parametrize(
+    "key",
+    [
+        "hero.image_alt",
+        "hero.deterministic_badge",
+        "status.file_loaded",
+        "status.analysis_complete",
+        "status.no_findings",
+    ],
+)
+def test_visual_status_copy_exists_in_both_languages(key: str) -> None:
+    assert i18n.translate(key, "it")
+    assert i18n.translate(key, "en")
+
+
 def test_catalog_builder_rejects_duplicate_keys() -> None:
     with pytest.raises(ValueError, match="Duplicate translation key: repeated"):
         i18n._build_catalog((("repeated", "first"), ("repeated", "second")))

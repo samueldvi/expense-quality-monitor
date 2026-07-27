@@ -28,6 +28,11 @@ ITALIAN_TRANSLATIONS = _build_catalog(
     (
         ("app.title", "Expense Quality Monitor"),
         ("app.subtitle", "Controlla il file, individua le eccezioni e prepara il riepilogo."),
+        ("hero.deterministic_badge", "Controlli deterministici, nessuna AI nel runtime"),
+        (
+            "hero.image_alt",
+            "Illustrazione astratta di una tabella verificata da controlli di qualità",
+        ),
         ("language.label", "Lingua"),
         ("language.italian", "Italiano"),
         ("language.english", "English"),
@@ -48,7 +53,10 @@ ITALIAN_TRANSLATIONS = _build_catalog(
         ("session.findings.many", "{count} segnalazioni"),
         ("session.processing_info", "Informazioni sull’elaborazione"),
         ("session.processing_detail", "L’analisi resta nella sessione e non crea uno storico."),
-        ("source.context", "{name} · {rows} righe · Analisi completata"),
+        ("source.kind.example", "File di esempio"),
+        ("status.file_loaded", "File caricato"),
+        ("status.analysis_complete", "Analisi completata"),
+        ("status.no_findings", "Nessuna segnalazione nella vista corrente."),
         (
             "source.extra.one",
             "Il file contiene 1 colonna aggiuntiva che non viene utilizzata nell’analisi.",
@@ -96,7 +104,10 @@ ITALIAN_TRANSLATIONS = _build_catalog(
         ("findings.reset", "Ripristina filtri"),
         ("findings.results.one", "1 risultato su {total}"),
         ("findings.results.many", "{shown} risultati su {total}"),
-        ("findings.no_results", "Nessun risultato con i filtri attuali."),
+        (
+            "findings.no_results_hint",
+            "Modifica la ricerca oppure ripristina i filtri per ampliare la vista.",
+        ),
         ("findings.download", "Scarica la vista corrente"),
         ("findings.table.source_row", "Riga CSV"),
         ("findings.table.expense_id", "ID spesa"),
@@ -195,6 +206,11 @@ ENGLISH_TRANSLATIONS = _build_catalog(
     (
         ("app.title", "Expense Quality Monitor"),
         ("app.subtitle", "Check the file, identify exceptions, and prepare the summary."),
+        ("hero.deterministic_badge", "Deterministic checks, no AI at runtime"),
+        (
+            "hero.image_alt",
+            "Abstract illustration of a table verified by quality checks",
+        ),
         ("language.label", "Language"),
         ("language.italian", "Italiano"),
         ("language.english", "English"),
@@ -215,7 +231,10 @@ ENGLISH_TRANSLATIONS = _build_catalog(
         ("session.findings.many", "{count} findings"),
         ("session.processing_info", "Processing information"),
         ("session.processing_detail", "The analysis stays in this session and creates no history."),
-        ("source.context", "{name} · {rows} rows · Analysis complete"),
+        ("source.kind.example", "Example file"),
+        ("status.file_loaded", "File loaded"),
+        ("status.analysis_complete", "Analysis complete"),
+        ("status.no_findings", "No findings in the current view."),
         ("source.extra.one", "The file contains 1 extra column that is not used in the analysis."),
         (
             "source.extra.many",
@@ -260,7 +279,10 @@ ENGLISH_TRANSLATIONS = _build_catalog(
         ("findings.reset", "Reset filters"),
         ("findings.results.one", "1 result out of {total}"),
         ("findings.results.many", "{shown} results out of {total}"),
-        ("findings.no_results", "No results match the current filters."),
+        (
+            "findings.no_results_hint",
+            "Change the search or reset the filters to broaden the view.",
+        ),
         ("findings.download", "Download the current view"),
         ("findings.table.source_row", "CSV row"),
         ("findings.table.expense_id", "Expense ID"),

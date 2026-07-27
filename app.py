@@ -3,11 +3,13 @@
 from __future__ import annotations
 
 import csv
+import html
 import logging
 from collections.abc import Callable, Mapping, Sequence
 from io import BytesIO, StringIO
 from pathlib import Path
 from typing import cast
+from urllib.parse import quote
 
 import pandas as pd
 import streamlit as st
@@ -25,10 +27,17 @@ from expense_quality_monitor.loader import (
 )
 from expense_quality_monitor.pipeline import AnalysisResult, analyze_expenses
 from expense_quality_monitor.reporting import findings_to_csv
+from expense_quality_monitor.ui_theme import (
+    chart_color_for_status,
+    role_icon,
+    semantic_role_for_status,
+    status_cell_style,
+)
 
 LOGGER = logging.getLogger(__name__)
 ROOT = Path(__file__).resolve().parent
 EXAMPLE_PATH = ROOT / "data" / "synthetic_expenses.csv"
+HERO_PATH = ROOT / "docs" / "assets" / "dashboard-hero.svg"
 TEMPLATE_FILENAME = "expense_quality_monitor_template.csv"
 FINDINGS_FILENAME = "expense_quality_findings.csv"
 CSV_MIME_TYPE = "text/csv"
@@ -72,6 +81,12 @@ STATUS_KEYS = {
     "richiede approvazione": "finding.status.richiede_approvazione",
     "non conforme": "finding.status.non_conforme",
 }
+SECTION_ICONS = {
+    "overview": "▦",
+    "findings": "⚑",
+    "data": "▤",
+    "export": "⇩",
+}
 
 
 def counts_to_frame(
@@ -109,6 +124,25 @@ def tr(key: str, **values: object) -> str:
     return i18n.translate(key, current_language(), **values)
 
 
+def current_theme() -> str:
+    """Return the active Streamlit theme with a deterministic light fallback."""
+    try:
+        theme = st.context.theme.type
+    except (AttributeError, RuntimeError):
+        theme = None
+    return theme if theme in {"light", "dark"} else "light"
+
+
+def accessible_hero_svg(description: str) -> str:
+    """Return the local hero SVG with a localized accessible name."""
+    svg = HERO_PATH.read_text(encoding="utf-8")
+    label = html.escape(description, quote=True)
+    return (
+        f'<img src="data:image/svg+xml,{quote(svg)}" alt="{label}" '
+        'style="display:block;width:100%;height:auto;max-height:16rem">'
+    )
+
+
 def localized_value(
     value: object,
     keys: Mapping[str, str],
@@ -137,9 +171,13 @@ def findings_for_presentation(findings: pd.DataFrame, language: str) -> pd.DataF
     presented["anomaly_type"] = presented["anomaly_type"].map(
         lambda value: localized_value(value, ANOMALY_TYPE_KEYS, language)
     )
-    presented["status"] = presented["status"].map(
-        lambda value: localized_value(value, STATUS_KEYS, language)
-    )
+    presented["status"] = [
+        (
+            f"{role_icon(semantic_role_for_status(value))} "
+            f"{localized_value(value, STATUS_KEYS, language)}"
+        )
+        for value in presented["status"]
+    ]
     presented["message"] = [
         localized_rule_message(rule_id, message, language)
         for rule_id, message in zip(
@@ -274,6 +312,7 @@ def render_example_button(*, key: str) -> None:
         key=key,
         on_click=activate_example_source,
         type="primary",
+        icon=":material/science:",
         width="stretch",
     )
 
@@ -299,7 +338,7 @@ def friendly_load_error(error: CsvLoadError) -> str:
 
 def render_schema_guidance(schema: SchemaComparison) -> None:
     """Explain an incompatible expense schema and offer useful local actions."""
-    st.warning(tr("schema.incompatible"))
+    st.warning(tr("schema.incompatible"), icon=":material/warning:")
     st.write(tr("schema.guidance"))
     with st.container(border=True):
         st.subheader(tr("schema.missing_columns"))
@@ -323,6 +362,7 @@ def render_schema_guidance(schema: SchemaComparison) -> None:
             data=build_template_csv(),
             file_name=TEMPLATE_FILENAME,
             mime=CSV_MIME_TYPE,
+            icon=":material/download:",
             width="stretch",
         )
     with action_columns[1]:
@@ -330,9 +370,14 @@ def render_schema_guidance(schema: SchemaComparison) -> None:
 
 
 def render_header() -> None:
-    """Render the product name and factual description."""
-    st.title(tr("app.title"))
-    st.write(tr("app.subtitle"))
+    """Render a compact product hero with a local, descriptive illustration."""
+    text_column, image_column = st.columns([3, 1], gap="large", vertical_alignment="center")
+    with text_column:
+        st.title(tr("app.title"))
+        st.write(tr("app.subtitle"))
+        st.caption(f"✓ {tr('hero.deterministic_badge')}")
+    with image_column:
+        st.html(accessible_hero_svg(tr("hero.image_alt")))
 
 
 def render_initial_state() -> None:
@@ -353,6 +398,15 @@ def render_initial_state() -> None:
             st.write(tr("upload.example"))
             render_example_button(key="use_example")
             st.caption("data/synthetic_expenses.csv")
+        st.divider()
+        st.caption(tr("upload.template_description"))
+        st.download_button(
+            tr("upload.template_download"),
+            data=build_template_csv(),
+            file_name=TEMPLATE_FILENAME,
+            mime=CSV_MIME_TYPE,
+            icon=":material/download:",
+        )
     st.caption(tr("upload.privacy"))
 
 
@@ -360,7 +414,7 @@ def render_language_selector() -> None:
     """Render a persistent selector whose values remain stable language codes."""
     language = current_language()
     st.sidebar.selectbox(
-        i18n.translate("language.label", language),
+        f"🌐 {i18n.translate('language.label', language)}",
         i18n.SUPPORTED_LANGUAGES,
         key="language",
         format_func=lambda code: i18n.translate(
@@ -377,7 +431,7 @@ def render_sidebar(result: AnalysisResult | None = None) -> None:
     source_name = st.session_state.get("source_name")
     if source_name:
         st.sidebar.caption(tr("upload.selected"))
-        st.sidebar.write(source_name)
+        st.sidebar.text(source_name)
         st.sidebar.file_uploader(
             tr("upload.replace"),
             type=["csv"],
@@ -398,9 +452,26 @@ def render_sidebar(result: AnalysisResult | None = None) -> None:
         st.write(tr("session.processing_detail"))
 
 
-def render_file_context(source_name: str, total_rows: int) -> None:
-    """Show compact source and analysis status."""
-    st.caption(tr("source.context", name=source_name, rows=total_rows))
+def render_file_context(
+    source_name: str,
+    *,
+    is_example: bool,
+    extra_columns: tuple[str, ...],
+) -> None:
+    """Show compact source provenance and analysis status without repeating KPIs."""
+    source_kind = tr("source.kind.example" if is_example else "status.file_loaded")
+    with st.container(border=True):
+        st.text(f"📄 {source_name}")
+        st.markdown(
+            ":blue-background["
+            f"{role_icon('information')} {source_kind}] "
+            ":green-background["
+            f"{role_icon('success')} {tr('status.analysis_complete')}]"
+        )
+        if extra_columns:
+            extra_count = len(extra_columns)
+            extra_key = "source.extra.one" if extra_count == 1 else "source.extra.many"
+            st.info(tr(extra_key, count=extra_count), icon=":material/info:")
 
 
 def render_overview(result: AnalysisResult) -> None:
@@ -414,14 +485,22 @@ def render_overview(result: AnalysisResult) -> None:
     language = current_language()
 
     metric_columns = st.columns(4)
-    metric_columns[0].metric(tr("metric.total_rows"), total_rows)
-    metric_columns[1].metric(tr("metric.rows_to_review"), rows_with_findings)
-    metric_columns[2].metric(tr("metric.findings"), len(result.findings))
-    metric_columns[3].metric(tr("metric.rules"), distinct_rule_count(result.findings))
+    metric_columns[0].metric(tr("metric.total_rows"), total_rows, border=True)
+    metric_columns[1].metric(
+        f"{role_icon('warning')} {tr('metric.rows_to_review')}",
+        rows_with_findings,
+        border=True,
+    )
+    metric_columns[2].metric(tr("metric.findings"), len(result.findings), border=True)
+    metric_columns[3].metric(
+        tr("metric.rules"),
+        distinct_rule_count(result.findings),
+        border=True,
+    )
 
     distribution_column, status_column = st.columns(2, gap="large")
     with distribution_column:
-        st.subheader(tr("overview.findings_by_type"))
+        st.subheader(f"▥ {tr('overview.findings_by_type')}")
         type_label = tr("common.type")
         count_label = tr("common.count")
         anomaly_frame = counts_to_frame(
@@ -432,18 +511,53 @@ def render_overview(result: AnalysisResult) -> None:
         )
         st.bar_chart(anomaly_frame, x=type_label, y=count_label, height=260)
     with status_column:
-        st.subheader(tr("overview.findings_by_status"))
+        st.subheader(f"◉ {tr('overview.findings_by_status')}")
         status_label = tr("common.status")
         count_label = tr("common.count")
-        status_frame = counts_to_frame(
-            by_status,
-            status_label,
-            lambda value: localized_value(value, STATUS_KEYS, language),
-            count_label,
+        status_rows = [
+            {
+                status_label: localized_value(status, STATUS_KEYS, language),
+                count_label: count,
+                "_color": chart_color_for_status(status, current_theme()),
+            }
+            for status, count in sorted(by_status.items())
+        ]
+        status_frame = pd.DataFrame(
+            status_rows,
+            columns=[status_label, count_label, "_color"],
         )
-        st.bar_chart(status_frame, x=status_label, y=count_label, height=260)
+        st.vega_lite_chart(
+            status_frame,
+            spec={
+                "mark": {"type": "bar", "cornerRadiusEnd": 4},
+                "encoding": {
+                    "x": {
+                        "field": status_label,
+                        "type": "nominal",
+                        "axis": {"labelAngle": -35, "title": status_label},
+                        "sort": None,
+                    },
+                    "y": {
+                        "field": count_label,
+                        "type": "quantitative",
+                        "title": count_label,
+                    },
+                    "color": {
+                        "field": "_color",
+                        "type": "nominal",
+                        "scale": None,
+                        "legend": None,
+                    },
+                    "tooltip": [
+                        {"field": status_label, "type": "nominal"},
+                        {"field": count_label, "type": "quantitative"},
+                    ],
+                },
+            },
+            height=260,
+        )
 
-    st.subheader(tr("overview.categories"))
+    st.subheader(f"▦ {tr('overview.categories')}")
     st.dataframe(
         by_category,
         hide_index=True,
@@ -497,7 +611,11 @@ def render_filter_controls(enriched_findings: pd.DataFrame) -> pd.DataFrame:
             sorted(enriched_findings["rule_id"].dropna().unique()),
             key="filter_rules",
         )
-    st.button(tr("findings.reset"), on_click=reset_filters)
+    st.button(
+        tr("findings.reset"),
+        on_click=reset_filters,
+        icon=":material/filter_alt_off:",
+    )
     return filter_findings(
         enriched_findings,
         query=st.session_state["finding_search"],
@@ -512,8 +630,21 @@ def render_filter_controls(enriched_findings: pd.DataFrame) -> pd.DataFrame:
 def findings_table(findings: pd.DataFrame, language: str) -> None:
     """Render findings with user-facing labels and stable source ordering."""
     presented = findings_for_presentation(findings, language)
+    table = presented.loc[:, TABLE_COLUMNS]
+    status_styles = {
+        displayed: status_cell_style(canonical, current_theme())
+        for displayed, canonical in zip(
+            table["status"],
+            findings["status"],
+            strict=True,
+        )
+    }
+    styled_table = table.style.map(
+        lambda value: status_styles.get(str(value), ""),
+        subset=["status"],
+    )
     st.dataframe(
-        presented.loc[:, TABLE_COLUMNS],
+        styled_table,
         hide_index=True,
         width="stretch",
         height=520,
@@ -583,6 +714,7 @@ def render_findings_download(findings: pd.DataFrame, *, key: str) -> None:
         file_name=FINDINGS_FILENAME,
         mime=CSV_MIME_TYPE,
         type="primary",
+        icon=":material/download:",
         key=key,
     )
 
@@ -590,14 +722,15 @@ def render_findings_download(findings: pd.DataFrame, *, key: str) -> None:
 def render_findings(result: AnalysisResult, enriched_findings: pd.DataFrame) -> pd.DataFrame:
     """Render the primary findings workspace and return its current view."""
     language = current_language()
-    st.subheader(tr("findings.title"))
+    st.subheader(f"{SECTION_ICONS['findings']} {tr('findings.title')}")
     filtered = render_filter_controls(enriched_findings)
     shown = len(filtered)
     total = len(result.findings)
     results_key = "findings.results.one" if shown == 1 else "findings.results.many"
     st.write(tr(results_key, shown=shown, total=total))
     if filtered.empty:
-        st.info(tr("findings.no_results"))
+        st.success(tr("status.no_findings"), icon=":material/check_circle:")
+        st.caption(tr("findings.no_results_hint"))
     findings_table(filtered, language)
     render_findings_download(filtered, key="findings_download")
     return filtered
@@ -605,7 +738,7 @@ def render_findings(result: AnalysisResult, enriched_findings: pd.DataFrame) -> 
 
 def render_data(result: AnalysisResult, source_name: str) -> None:
     """Render source metadata and a preview without internal working columns."""
-    st.subheader(tr("data.title"))
+    st.subheader(f"{SECTION_ICONS['data']} {tr('data.title')}")
     st.write(tr("data.description"))
     source_view = result.source_data.drop(columns=["source_row_number"], errors="ignore")
     metadata_columns = st.columns(3)
@@ -620,7 +753,7 @@ def render_data(result: AnalysisResult, source_name: str) -> None:
 
 def render_export(filtered: pd.DataFrame, language: str) -> None:
     """Render export facts and download the current filtered schema."""
-    st.subheader(tr("export.title"))
+    st.subheader(f"{SECTION_ICONS['export']} {tr('export.title')}")
     export_columns = st.columns(3)
     export_columns[0].metric(tr("metric.rows_included"), len(filtered))
     export_columns[1].metric(tr("metric.format"), "CSV")
@@ -628,7 +761,7 @@ def render_export(filtered: pd.DataFrame, language: str) -> None:
     st.caption(tr("export.active_filters"))
     st.write(current_filter_description(language))
     if filtered.empty:
-        st.info(tr("export.empty"))
+        st.success(tr("export.empty"), icon=":material/check_circle:")
         return
     render_findings_download(filtered, key="export_download")
 
@@ -645,10 +778,10 @@ def analyze_current_source() -> AnalysisResult | None:
         if error.code == CSV_ERROR_INCOMPATIBLE_SCHEMA and error.schema is not None:
             render_schema_guidance(error.schema)
         else:
-            st.warning(friendly_load_error(error))
+            st.warning(friendly_load_error(error), icon=":material/warning:")
     except Exception:
         LOGGER.exception("Errore imprevisto durante l'analisi del CSV.")
-        st.error(tr("error.unexpected"))
+        st.error(tr("error.unexpected"), icon=":material/error:")
     return None
 
 
@@ -658,7 +791,7 @@ def render_dashboard() -> None:
         page_title="Expense Quality Monitor",
         page_icon=":material/monitoring:",
         layout="wide",
-        initial_sidebar_state="expanded",
+        initial_sidebar_state="auto",
     )
     initialize_language()
     render_header()
@@ -671,12 +804,12 @@ def render_dashboard() -> None:
 
     render_sidebar(result)
     source_name = cast(str, st.session_state["source_name"])
-    render_file_context(source_name, len(result.source_data))
     extra_columns = source_extra_columns(result.source_data)
-    if extra_columns:
-        extra_count = len(extra_columns)
-        extra_key = "source.extra.one" if extra_count == 1 else "source.extra.many"
-        st.info(tr(extra_key, count=extra_count))
+    render_file_context(
+        source_name,
+        is_example=bool(st.session_state.get("source_is_example")),
+        extra_columns=extra_columns,
+    )
     stable_section = st.session_state.setdefault("workspace_section", DEFAULT_SECTION)
     if stable_section not in SECTION_IDS:
         stable_section = DEFAULT_SECTION
@@ -689,7 +822,7 @@ def render_dashboard() -> None:
         SECTION_IDS,
         key=SECTION_WIDGET_KEY,
         label_visibility="collapsed",
-        format_func=lambda section_id: tr(f"nav.{section_id}"),
+        format_func=lambda section_id: f"{SECTION_ICONS[section_id]} {tr(f'nav.{section_id}')}",
     )
     if section in SECTION_IDS:
         st.session_state["workspace_section"] = section
