@@ -1,210 +1,159 @@
-# expense-quality-monitor
+# Expense Quality Monitor
+
+[![CI](https://github.com/samueldvi/expense-quality-monitor/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/samueldvi/expense-quality-monitor/actions/workflows/ci.yml)
+
+[Apri la demo online](https://samueldvi-expense-quality-monitor-app-elpqlb.streamlit.app/)
+
+## TL;DR
+
+Expense Quality Monitor riceve un CSV di spese, applica controlli deterministici e produce segnalazioni motivate, riepiloghi ed export filtrabili. È pensato per amministrazione, finance e controllo di gestione, con risultati consultabili attraverso una dashboard.
+
+## Demo online
+
+La versione dimostrativa è disponibile su [Streamlit Community Cloud](https://samueldvi-expense-quality-monitor-app-elpqlb.streamlit.app/).
+
+Usare esclusivamente dati sintetici o controllati, privi di informazioni aziendali o personali reali.
+
+## Anteprima
+
+![Panoramica di Expense Quality Monitor](docs/assets/dashboard-overview.png)
+
+Panoramica del file di esempio dopo l’esecuzione dei controlli.
+
+## Per chi è pensato
+
+- uffici amministrativi che verificano periodicamente le note spese;
+- team finance e controllo di gestione che preparano riepiloghi;
+- responsabili delle note spese che devono esaminare eccezioni e policy;
+- data quality specialist e consulenti che controllano flussi CSV periodici.
+
+## Problema affrontato
+
+Il controllo manuale dei file di spesa rende difficile individuare con continuità campi mancanti, valori non validi, duplicati, anomalie e superamenti delle soglie di policy. Senza un processo ripetibile, anche il riepilogo delle eccezioni e la motivazione delle segnalazioni risultano meno verificabili.
+
+Il progetto applica le stesse regole a ogni esecuzione e restituisce una vista ordinata delle righe da approfondire. Non sono stati misurati risparmi economici o temporali.
+
+## Cosa offre
+
+- caricamento di CSV con separatore virgola o punto e virgola;
+- file di esempio versionato per esplorare il flusso;
+- confronto dello schema con le colonne attese;
+- controlli di completezza, validità, unicità, statistica e policy;
+- ricerca e filtri sulle segnalazioni;
+- dashboard con metriche e riepiloghi;
+- export CSV della vista corrente.
+
+## Come funziona
 
 ![Flusso di Expense Quality Monitor](docs/assets/expense-quality-monitor-flow.png)
 
-Strumento locale per automatizzare il controllo settimanale degli export CSV delle note spese. Il problema affrontato è la presenza ricorrente di dati mancanti, valori non validi, duplicati, importi anomali e spese soggette ad approvazione, oggi verificati manualmente prima del riepilogo per il CFO.
+1. caricamento del CSV;
+2. validazione dello schema;
+3. normalizzazione dei valori di lavoro;
+4. esecuzione delle regole deterministiche;
+5. generazione delle segnalazioni;
+6. analisi dei risultati ed export.
 
-Documentazione finale:
+## Struttura del CSV
 
-- [Case study](docs/CASE_STUDY.md)
-- [Case sheet](docs/CASE_SHEET.md)
-- [Guida demo — 20 minuti](docs/DEMO.md)
-- [Retrospettiva](docs/RETROSPECTIVE.md)
-- [Note di revisione critica](docs/REVIEW_NOTES.md)
-
-## Soluzione
-
-Il progetto implementa un monolite modulare deterministico che:
-
-1. carica il CSV e confronta le intestazioni con lo schema canonico derivato da `EXPECTED_COLUMNS`;
-2. conserva i valori originali e crea valori di lavoro normalizzati;
-3. applica regole indipendenti di qualità, anomalia e policy;
-4. produce segnalazioni ordinate e verificabili;
-5. presenta metriche, riepiloghi, filtri e download tramite Streamlit.
-
-Il motore non usa modelli AI nel runtime e non effettua chiamate esterne durante l’analisi.
-
-## Stack e architettura
-
-- Python 3.11 o successivo;
-- pandas per caricamento e analisi tabellare;
-- Streamlit per la dashboard;
-- pytest per test unitari, di integrazione, regressione e interfaccia;
-- Ruff per lint e formattazione;
-- Bandit per la scansione di sicurezza;
-- GitHub Actions per la CI.
-
-L’architettura è un monolite modulare: `pipeline.py` coordina il flusso, mentre caricamento, normalizzazione, regole e reporting restano separati. Questa struttura mantiene semplice l’esecuzione locale e rende ogni controllo verificabile in isolamento.
-
-## Dati e governance
-
-Sono ammessi esclusivamente dati sintetici. Non devono essere caricati dati aziendali, di clienti o di persone reali, né devono essere inviati a strumenti AI.
-
-Il dataset dimostrativo è:
+Il file usa queste dieci colonne canoniche:
 
 ```text
-data/synthetic_expenses.csv
+id_spesa
+data_spesa
+dipendente
+centro_di_costo
+categoria
+descrizione
+importo
+valuta_originale
+progetto
+approvatore
 ```
 
-La relativa ground truth è:
+Sono supportati i separatori `,` e `;` e la codifica UTF-8 con o senza BOM. Gli spazi esterni e le differenze tra maiuscole e minuscole nelle intestazioni vengono normalizzati prima del confronto con lo schema. Le colonne aggiuntive sono accettate, ma non partecipano alle regole.
 
-```text
-data/expected_anomalies.csv
-```
+Dall’app è possibile scaricare un modello CSV con le colonne già predisposte. Formati, obbligatorietà e criteri di validazione sono descritti nei [requisiti](docs/requirements.md).
 
-## Controlli implementati
+## Risultati del file di esempio
 
-- completezza dei sei campi obbligatori;
-- validità di identificativo, data, importo e categoria;
-- duplicati per `id_spesa` ripetuto;
-- duplicati logici con identificativi diversi e confronto normalizzato;
-- anomalie statistiche per categoria oltre tre volte la mediana;
-- non valutabilità statistica sotto cinque osservazioni utilizzabili;
-- soglie di policy e stato `richiede approvazione`;
-- non conformità sopra soglia senza approvatore.
+Il dataset controllato incluso nel repository produce:
 
-Le regole, le soglie e i messaggi sono centralizzati e deterministici. L’export CSV delle segnalazioni neutralizza valori che potrebbero essere interpretati come formule da un foglio di calcolo.
+| Misura | Risultato |
+|---|---:|
+| Righe analizzate | 300 |
+| Righe da verificare | 37 |
+| Segnalazioni | 43 |
+| Regole coinvolte | 17 |
 
-## Dashboard Streamlit
+Seed, scenari intenzionali e ground truth sono documentati nella [specifica del dataset](docs/dataset.md).
 
-La dashboard:
+## Avvio locale
 
-- carica un CSV esclusivamente in memoria;
-- accetta separatori con virgola o punto e virgola e testo UTF-8 con o senza BOM;
-- normalizza BOM, spazi esterni e maiuscole delle intestazioni prima del confronto;
-- accetta colonne aggiuntive, che restano escluse dalle regole;
-- mostra colonne mancanti, trovate e aggiuntive quando lo schema non è compatibile;
-- rileva intestazioni duplicate dopo la normalizzazione;
-- offre un modello CSV scaricabile e il dataset locale di esempio;
-- mostra righe totali, righe con segnalazioni e segnalazioni complessive;
-- presenta conteggi per tipo, stato e categoria;
-- ricerca e filtra le segnalazioni per tipo, stato, categoria e regola;
-- esporta in CSV la vista corrente.
-
-File vuoti, contenuti illeggibili e schemi incompatibili producono messaggi specifici. Gli errori inattesi non espongono dettagli interni o contenuti del file.
-
-## Risultati verificati
-
-Sul dataset dimostrativo:
-
-- 300 righe sintetiche;
-- 37 righe con almeno una segnalazione;
-- 43 segnalazioni attese;
-- corrispondenza esatta con la ground truth;
-- la versione corrente del branch dispone di 75 test automatici.
-
-## Installazione
+Richiede Python 3.11 o successivo.
 
 ```bash
-python3 -m venv .venv
+python -m venv .venv
 source .venv/bin/activate
-python3 -m pip install -e ".[dev]"
+python -m pip install -r requirements.txt
+python -m streamlit run app.py
 ```
 
-## Generazione del dataset
-
-```bash
-python3 scripts/generate_dataset.py
-```
-
-La generazione usa il seed fisso `20260713`, una settimana sintetica fissa e sovrascrive deterministicamente:
-
-- `data/synthetic_expenses.csv`;
-- `data/expected_anomalies.csv`.
-
-## Avvio della dashboard
-
-```bash
-streamlit run app.py
-```
-
-Per la dimostrazione caricare `data/synthetic_expenses.csv`.
+Per provare il flusso senza preparare un file, selezionare **Prova con l’esempio** nella schermata iniziale.
 
 ## Test e qualità
 
 ```bash
-python3 -m pytest -q
-python3 -m ruff check .
-python3 -m ruff format --check .
-python3 -m bandit -r src app.py -c pyproject.toml
-python3 -m compileall src tests app.py
-python3 -m pip check
+python -m pytest -q
+python -m ruff check .
+python -m ruff format --check .
 ```
 
-La workflow `.github/workflows/ci.yml` esegue su push e pull request verso `main` la rigenerazione dei dataset, il controllo delle differenze, i test, Ruff, Bandit e compileall. Non sono previsti workflow CD; il deployment dimostrativo viene configurato separatamente su Streamlit Community Cloud.
+La versione corrente dispone di 77 test automatici. GitHub Actions rigenera il dataset, verifica la ground truth ed esegue test, Ruff, Bandit e compilazione dei sorgenti. A parità di input e versione, la pipeline produce risultati deterministici.
 
-## Deployment
+## Architettura
 
-L’applicazione può essere distribuita su Streamlit Community Cloud utilizzando:
-
-- repository: `samueldvi/expense-quality-monitor`;
-- branch di produzione: `main`;
-- entrypoint: `app.py`;
-- versione Python: `3.11`.
-
-Il deployment pubblico non è ancora attivo e mantiene il vincolo di utilizzare esclusivamente dati sintetici.
-
-## Struttura del repository
+Il progetto è un monolite modulare: l’interfaccia coordina componenti separati, mentre regole e reporting restano indipendenti dalla dashboard.
 
 ```text
-.
-├── .github/workflows/ci.yml
-├── .streamlit/config.toml
-├── README.md
-├── TIME_LOG.md
-├── app.py
-├── data/
-│   ├── expected_anomalies.csv
-│   └── synthetic_expenses.csv
-├── docs/
-│   ├── ASSUNZIONI.md
-│   ├── CASE_SHEET.md
-│   ├── CASE_STUDY.md
-│   ├── DEMO.md
-│   ├── RETROSPECTIVE.md
-│   ├── REVIEW_NOTES.md
-│   ├── assets/
-│   ├── brief.md
-│   ├── dataset.md
-│   ├── design.md
-│   └── requirements.md
-├── pyproject.toml
-├── requirements.txt
-├── scripts/generate_dataset.py
-├── src/expense_quality_monitor/
-│   ├── config.py
-│   ├── loader.py
-│   ├── normalization.py
-│   ├── pipeline.py
-│   ├── reporting.py
-│   └── rules/
-└── tests/
-    ├── test_app.py
-    ├── test_loader.py
-    ├── test_package_import.py
-    ├── test_pipeline_reporting.py
-    ├── test_regression.py
-    ├── test_rules.py
-    └── test_tool_configuration.py
+loader → normalizzazione → regole → pipeline → reporting → dashboard
 ```
 
-## Limiti e fuori ambito
+Responsabilità, scelte e alternative sono descritte nel [design della soluzione](docs/design.md).
 
-- analisi limitata a un singolo file settimanale;
+## AI e controllo umano
+
+L’AI è stata usata come supporto durante implementazione, revisione e documentazione, con un processo **human-in-the-loop**. Requisiti, assunzioni e decisioni sono stati verificati dall’autore; ogni modifica è stata riesaminata tramite diff e sottoposta ai controlli disponibili prima dell’accettazione. Nessun modello AI viene eseguito nel runtime dell’applicazione.
+
+Per le convenzioni di sviluppo e il processo di revisione, consultare
+[CONTRIBUTING.md](CONTRIBUTING.md). Le correzioni degli output AI sono registrate nelle
+[note di revisione](docs/REVIEW_NOTES.md); la valutazione del processo è raccolta nella
+[retrospettiva](docs/RETROSPECTIVE.md).
+
+## Limiti attuali
+
+- analisi di un singolo file per volta;
+- nessuno storico persistente;
+- nessuna autenticazione;
+- nessun database;
 - nessuna conversione valutaria;
-- nessun dato reale;
-- nessuna autenticazione, API, integrazione ERP o database;
-- nessuna analisi storica multi-settimana;
-- nessun workflow CD e nessun deployment pubblico attualmente attivo;
-- il deployment dimostrativo è un’estensione successiva al brief e non rende l’app pronta per dati reali, né aggiunge autenticazione o persistenza;
-- nessun modello AI nel runtime.
+- nessuna integrazione con sistemi aziendali;
+- validazione eseguita su un dataset controllato.
 
-## Commit e tracciabilità AI
+## Documentazione
 
-I commit che introducono o modificano contenuto usano i prefissi seguenti. I merge commit creati automaticamente da GitHub costituiscono commit tecnici e possono mantenere il messaggio generato dalla piattaforma.
+| Documento | Contenuto |
+|---|---|
+| [Requisiti](docs/requirements.md) | Schema, regole e criteri di accettazione. |
+| [Dataset](docs/dataset.md) | Scenari sintetici, seed e ground truth. |
+| [Design](docs/design.md) | Architettura, flusso e scelte tecniche. |
+| [Case study](docs/CASE_STUDY.md) | Contesto, soluzione e risultati del progetto. |
+| [Case sheet](docs/CASE_SHEET.md) | Sintesi, tempi, leva e trasferibilità. |
+| [Guida demo](docs/DEMO.md) | Percorso guidato per una dimostrazione di 20 minuti. |
+| [Retrospettiva](docs/RETROSPECTIVE.md) | Valutazione dell’uso dell’AI e del processo. |
+| [Note di revisione](docs/REVIEW_NOTES.md) | Problemi rilevati e correzioni motivate. |
+| [Registro delle ore](TIME_LOG.md) | Sessioni e durata effettiva del lavoro. |
 
-- `human:` per contenuto principalmente scritto o modificato dalla persona;
-- `ai-generated:` per contenuto principalmente generato dall’AI;
-- `ai-assisted:` per contenuto realizzato dalla persona con assistenza AI.
+## Licenza
 
-Assunzioni e correzioni critiche degli output AI sono documentate rispettivamente in `docs/ASSUNZIONI.md` e `docs/REVIEW_NOTES.md`.
+Licenza non ancora definita. Il repository è attualmente privato.

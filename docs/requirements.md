@@ -80,7 +80,7 @@ Realizzare uno strumento che riceva un file di note spese, esegua automaticament
   - `non conforme`: importo superiore alla soglia con `approvatore` vuoto.
 - Produrre un controllo di qualità e delle anomalie.
 - Mostrare in un piccolo cruscotto un riepilogo delle anomalie della settimana.
-- Utilizzare, quando sarà realizzato, un dataset sintetico realistico contenente volutamente valori nulli, duplicati, importi anomali e formati errati.
+- Utilizzare il dataset sintetico incluso nel repository, che contiene volutamente valori nulli, duplicati, importi anomali e formati errati.
 
 ## Criteri di accettazione
 
@@ -101,7 +101,7 @@ Realizzare uno strumento che riceva un file di note spese, esegua automaticament
 ## Requisiti non funzionali
 
 - Il progetto deve essere sviluppato con un processo strutturato: requisiti, design, implementazione e verifica.
-- Il codice futuro deve essere leggibile, organizzato, mantenibile e accompagnato da test automatici eseguibili.
+- Il codice deve essere leggibile, organizzato, mantenibile e accompagnato da test automatici eseguibili.
 - La soluzione deve includere un controllo di qualità del codice e una scansione di sicurezza di base.
 - La dashboard può essere leggera; la perfezione estetica non è un obiettivo della valutazione.
 - Le ore impiegate devono essere registrate in modo effettivo, senza stime retrospettive.
@@ -111,9 +111,11 @@ Realizzare uno strumento che riceva un file di note spese, esegua automaticament
 
 - Non devono essere usati dati aziendali o di clienti reali: sono ammessi esclusivamente dati sintetici.
 - I dati reali di clienti non devono essere inseriti nei prompt.
-- Ogni commit dovrà indicare chiaramente se il contenuto è principalmente scritto o modificato dalla persona, generato dall'AI oppure realizzato con assistenza AI.
-- Le assunzioni dovranno essere dichiarate esplicitamente senza presentarle come requisiti.
-- Almeno due casi reali di correzione, rifiuto o modifica critica di output AI dovranno essere annotati durante il progetto.
+- I messaggi di commit devono descrivere il contenuto della modifica secondo le convenzioni
+  definite in `CONTRIBUTING.md`; l'eventuale assistenza AI resta soggetta a revisione umana
+  e non determina il tipo di commit.
+- Le assunzioni devono essere dichiarate esplicitamente senza presentarle come requisiti.
+- Almeno due casi reali di correzione, rifiuto o modifica critica di output AI devono essere annotati durante il progetto.
 
 ## Chiarimenti del richiedente
 

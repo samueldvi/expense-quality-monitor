@@ -15,6 +15,12 @@ from expense_quality_monitor.config import EXPECTED_COLUMNS
 CsvSource: TypeAlias = str | Path | IO[str] | IO[bytes]
 SOURCE_ROW_COLUMN = "source_row_number"
 SUPPORTED_DELIMITERS = (",", ";")
+CSV_ERROR_EMPTY = "empty"
+CSV_ERROR_DUPLICATE_COLUMNS = "duplicate_columns"
+CSV_ERROR_INCOMPATIBLE_SCHEMA = "incompatible_schema"
+
+_CSV_ERROR_UNREADABLE = "unreadable"
+_UNREADABLE_CSV_MESSAGE = "Il contenuto non può essere letto come CSV."
 
 
 @dataclass(frozen=True)
@@ -91,7 +97,7 @@ def normalize_dataframe_columns(data: pd.DataFrame) -> pd.DataFrame:
     if duplicate_names:
         raise CsvLoadError(
             "Alcune colonne hanno lo stesso nome dopo la normalizzazione.",
-            code="duplicate_columns",
+            code=CSV_ERROR_DUPLICATE_COLUMNS,
         )
 
     renamed_columns = []
@@ -115,8 +121,8 @@ def _read_source_text(source: CsvSource) -> str:
             payload = source.read()
     except OSError as error:
         raise CsvLoadError(
-            "Il contenuto non può essere letto come CSV.",
-            code="unreadable",
+            _UNREADABLE_CSV_MESSAGE,
+            code=_CSV_ERROR_UNREADABLE,
         ) from error
 
     if isinstance(payload, bytes):
@@ -124,35 +130,35 @@ def _read_source_text(source: CsvSource) -> str:
             return payload.decode("utf-8-sig")
         except UnicodeDecodeError as error:
             raise CsvLoadError(
-                "Il contenuto non può essere letto come CSV.",
-                code="unreadable",
+                _UNREADABLE_CSV_MESSAGE,
+                code=_CSV_ERROR_UNREADABLE,
             ) from error
     if isinstance(payload, str):
         return payload.lstrip("\ufeff")
     raise CsvLoadError(
-        "Il contenuto non può essere letto come CSV.",
-        code="unreadable",
+        _UNREADABLE_CSV_MESSAGE,
+        code=_CSV_ERROR_UNREADABLE,
     )
 
 
 def detect_csv_format(content: str) -> str:
     """Return the detected comma or semicolon delimiter for readable CSV text."""
     if not content.strip():
-        raise CsvLoadError("Il file è vuoto.", code="empty")
+        raise CsvLoadError("Il file è vuoto.", code=CSV_ERROR_EMPTY)
 
     try:
         dialect = csv.Sniffer().sniff(content[:8192], delimiters="".join(SUPPORTED_DELIMITERS))
         header = next(csv.reader(StringIO(content), delimiter=dialect.delimiter))
     except (csv.Error, StopIteration) as error:
         raise CsvLoadError(
-            "Il contenuto non può essere letto come CSV.",
-            code="unreadable",
+            _UNREADABLE_CSV_MESSAGE,
+            code=_CSV_ERROR_UNREADABLE,
         ) from error
 
     if dialect.delimiter not in SUPPORTED_DELIMITERS or len(header) < 2:
         raise CsvLoadError(
-            "Il contenuto non può essere letto come CSV.",
-            code="unreadable",
+            _UNREADABLE_CSV_MESSAGE,
+            code=_CSV_ERROR_UNREADABLE,
         )
     return dialect.delimiter
 
@@ -163,15 +169,15 @@ def _reject_duplicate_headers(content: str, delimiter: str) -> None:
         header = next(csv.reader(StringIO(content), delimiter=delimiter))
     except (csv.Error, StopIteration) as error:
         raise CsvLoadError(
-            "Il contenuto non può essere letto come CSV.",
-            code="unreadable",
+            _UNREADABLE_CSV_MESSAGE,
+            code=_CSV_ERROR_UNREADABLE,
         ) from error
 
     normalized_names = [normalize_column_name(column) for column in header]
     if len(normalized_names) != len(set(normalized_names)):
         raise CsvLoadError(
             "Alcune colonne hanno lo stesso nome dopo la normalizzazione.",
-            code="duplicate_columns",
+            code=CSV_ERROR_DUPLICATE_COLUMNS,
         )
 
 
@@ -204,11 +210,11 @@ def load_expenses(source: CsvSource) -> pd.DataFrame:
             on_bad_lines="error",
         )
     except pd.errors.EmptyDataError as error:
-        raise CsvLoadError("Il file è vuoto.", code="empty") from error
+        raise CsvLoadError("Il file è vuoto.", code=CSV_ERROR_EMPTY) from error
     except (pd.errors.ParserError, UnicodeError, ValueError) as error:
         raise CsvLoadError(
-            "Il contenuto non può essere letto come CSV.",
-            code="unreadable",
+            _UNREADABLE_CSV_MESSAGE,
+            code=_CSV_ERROR_UNREADABLE,
         ) from error
 
     normalized = normalize_dataframe_columns(data)
@@ -217,12 +223,12 @@ def load_expenses(source: CsvSource) -> pd.DataFrame:
         names = ", ".join(schema.missing_columns)
         raise CsvLoadError(
             f"Colonne previste mancanti: {names}.",
-            code="incompatible_schema",
+            code=CSV_ERROR_INCOMPATIBLE_SCHEMA,
             schema=schema,
         )
 
     if normalized.empty:
-        raise CsvLoadError("Il file è vuoto.", code="empty")
+        raise CsvLoadError("Il file è vuoto.", code=CSV_ERROR_EMPTY)
 
     loaded = _preserve_conflicting_source_column(normalized)
     loaded.insert(0, SOURCE_ROW_COLUMN, range(1, len(loaded) + 1))

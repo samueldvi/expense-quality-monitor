@@ -11,20 +11,18 @@ Il dataset simula un export settimanale di note spese ed è destinato a verifica
 - controlli di policy;
 - casi non valutabili statisticamente.
 
-Tutti i dati saranno sintetici. Non verranno utilizzati dati aziendali, di clienti o di persone reali.
+Tutti i dati sono sintetici. Il dataset non contiene dati aziendali, di clienti o di persone reali.
 
-## 2. File previsti
+## 2. File generati
 
-La fase successiva produrrà due file:
+Il generatore produce due file:
 
 - `data/synthetic_expenses.csv`: export sintetico settimanale delle note spese;
 - `data/expected_anomalies.csv`: ground truth di ogni segnalazione introdotta intenzionalmente.
 
-Questi file sono soltanto specificati in questa fase e non vengono ancora generati.
-
 ## 3. Schema del CSV principale
 
-`data/synthetic_expenses.csv` conterrà esattamente le seguenti colonne, nello stesso ordine, senza colonne tecniche aggiuntive.
+`data/synthetic_expenses.csv` contiene esattamente le seguenti colonne, nello stesso ordine, senza colonne tecniche aggiuntive.
 
 | Ordine | Colonna | Obbligatoria | Tipo logico | Formato previsto | Esempio sintetico | Principali casi non validi da testare |
 |---:|---|---|---|---|---|---|
@@ -39,20 +37,20 @@ Questi file sono soltanto specificati in questa fase e non vengono ancora genera
 | 9 | `progetto` | Sì | Testo | Codice progetto sintetico, senza imporre una regex | `PRJ-2026-001` | nullo; vuoto; soli spazi |
 | 10 | `approvatore` | No | Testo | Nome fittizio o vuoto | `Serra Luca` | nullo, vuoto o soli spazi su una spesa sopra soglia |
 
-I valori nulli, vuoti o composti soltanto da spazi nei campi obbligatori saranno considerati mancanti. Date, importi, categorie e nomi saranno normalizzati soltanto per il controllo dei duplicati logici. La normalizzazione non modifica l'esito dei controlli di validità.
+I valori nulli, vuoti o composti soltanto da spazi nei campi obbligatori sono considerati mancanti. Date, importi, categorie e nomi sono normalizzati soltanto per il controllo dei duplicati logici. La normalizzazione non modifica l'esito dei controlli di validità.
 
 ## 4. Dimensione e periodo
 
-- Il CSV principale conterrà esattamente 300 righe di dati, oltre all'intestazione.
-- Tutte le date valide apparterranno alla settimana lavorativa sintetica dal 13/07/2026 al 17/07/2026.
-- La distribuzione tra giorni, categorie, dipendenti e progetti sarà realistica ma non necessariamente uniforme.
-- Almeno l'80% delle righe non conterrà errori intenzionali.
-- La generazione userà il seed fisso `20260713`.
-- La categoria `Formazione` conterrà esattamente 4 righe complessive.
+- Il CSV principale contiene esattamente 300 righe di dati, oltre all'intestazione.
+- Tutte le date valide appartengono alla settimana lavorativa sintetica dal 13/07/2026 al 17/07/2026.
+- La distribuzione tra giorni, categorie, dipendenti e progetti è realistica ma non necessariamente uniforme.
+- Almeno l'80% delle righe non contiene errori intenzionali.
+- La generazione usa il seed fisso `20260713`.
+- La categoria `Formazione` contiene esattamente 4 righe complessive.
 
 ## 5. Categorie ammesse
 
-I soli valori validi di `categoria` saranno:
+I soli valori validi di `categoria` sono:
 
 - Vitto;
 - Trasporto;
@@ -61,11 +59,11 @@ I soli valori validi di `categoria` saranno:
 - Rappresentanza;
 - Formazione.
 
-La validazione della categoria è stretta: sono validi soltanto questi sei valori esatti, con la stessa ortografia e lo stesso uso di maiuscole e minuscole e senza spazi aggiuntivi. La normalizzazione di spazi e maiuscole/minuscole è applicata esclusivamente per confrontare i duplicati logici e non rende valida una categoria non conforme. Valori diversi saranno presenti soltanto nei due scenari intenzionali di categoria non ammessa e saranno registrati nella ground truth.
+La validazione della categoria è stretta: sono validi soltanto questi sei valori esatti, con la stessa ortografia e lo stesso uso di maiuscole e minuscole e senza spazi aggiuntivi. La normalizzazione di spazi e maiuscole/minuscole è applicata esclusivamente per confrontare i duplicati logici e non rende valida una categoria non conforme. Valori diversi sono presenti soltanto nei due scenari intenzionali di categoria non ammessa e sono registrati nella ground truth.
 
 ## 6. Caratteristiche delle righe valide
 
-Le righe valide avranno:
+Le righe valide hanno:
 
 - date comprese tra il 13/07/2026 e il 17/07/2026;
 - identificativi sintetici progressivi;
@@ -104,13 +102,13 @@ Le quantità indicate contano le righe del CSV principale coinvolte. Le coppie s
 
 Le quattro righe di `Formazione` comprendono esattamente una spesa sopra soglia con approvatore e una spesa sopra soglia senza approvatore. Le altre due righe di `Formazione` restano sotto o uguali alla soglia fissa. Le due spese sopra soglia sono incluse rispettivamente nelle quantità dei due scenari di policy.
 
-Per le cinque categorie statisticamente valutabili, distribuzioni e importi saranno costruiti affinché la mediana resti stabile e ciascuna delle cinque righe designate sia strettamente maggiore di tre volte la propria mediana. Tra queste cinque anomalie statistiche:
+Per le cinque categorie statisticamente valutabili, distribuzioni e importi mantengono stabile la mediana e ciascuna delle cinque righe designate è strettamente maggiore di tre volte la propria mediana. Tra queste cinque anomalie statistiche:
 
 - una supera anche la soglia di policy e ha `approvatore` valorizzato;
 - una supera anche la soglia di policy e ha `approvatore` assente;
 - le altre tre restano sotto o uguali alla soglia di policy della rispettiva categoria.
 
-In totale la ground truth conterrà esattamente 5 segnalazioni `STATISTICAL_AMOUNT_ANOMALY`, 4 segnalazioni `POLICY_APPROVAL_REQUIRED` e 2 segnalazioni `POLICY_MISSING_APPROVER`. Le righe con importi mancanti, negativi o non numerici e quelle con categoria mancante o non ammessa non saranno usate per determinare i valori sintetici delle mediane.
+In totale la ground truth contiene esattamente 5 segnalazioni `STATISTICAL_AMOUNT_ANOMALY`, 4 segnalazioni `POLICY_APPROVAL_REQUIRED` e 2 segnalazioni `POLICY_MISSING_APPROVER`. Le righe con importi mancanti, negativi o non numerici e quelle con categoria mancante o non ammessa non sono usate per determinare i valori sintetici delle mediane.
 
 ## 8. Sovrapposizione degli scenari
 
@@ -125,15 +123,15 @@ Sono previste soltanto queste sovrapposizioni intenzionali:
 | Ogni membro delle tre coppie con `id_spesa` ripetuto | Due righe condividono lo stesso identificativo | Verificare che l'intera coppia sia riconosciuta | duplicato per `id_spesa` ripetuto |
 | Ogni membro delle tre coppie logiche | Due righe descrivono la stessa spesa con identificativi diversi | Verificare il confronto normalizzato | duplicato logico |
 
-Una delle tre coppie logiche manterrà `categoria` identica e strettamente valida in entrambe le righe. Userà spazi esterni e differenze di maiuscole/minuscole soltanto in `dipendente`, oltre a `,` e `.` come separatori decimali per rappresentare lo stesso importo. Le altre due coppie useranno valori già uniformi.
+Una delle tre coppie logiche mantiene `categoria` identica e strettamente valida in entrambe le righe. Usa spazi esterni e differenze di maiuscole/minuscole soltanto in `dipendente`, oltre a `,` e `.` come separatori decimali per rappresentare lo stesso importo. Le altre due coppie usano valori già uniformi.
 
-Due delle cinque anomalie statistiche si sovrapporranno intenzionalmente agli scenari di policy come indicato nella tabella; le altre tre resteranno distinte dai controlli di policy. Gli altri errori intenzionali non si sovrapporranno. In questo modo ogni risultato resterà attribuibile a una regola precisa.
+Due delle cinque anomalie statistiche si sovrappongono intenzionalmente agli scenari di policy come indicato nella tabella; le altre tre restano distinte dai controlli di policy. Gli altri errori intenzionali non si sovrappongono. In questo modo ogni risultato resta attribuibile a una regola precisa.
 
-Un campo obbligatorio mancante produrrà la sola segnalazione di completezza relativa a quel campo: le regole di validità saranno applicate ai valori presenti ma malformati. In particolare, un importo mancante non sarà contato anche come non numerico e una categoria mancante non sarà contata anche come non ammessa.
+Un campo obbligatorio mancante produce la sola segnalazione di completezza relativa a quel campo: le regole di validità sono applicate ai valori presenti ma malformati. In particolare, un importo mancante non è contato anche come non numerico e una categoria mancante non è contata anche come non ammessa.
 
 ## 9. Ground truth
 
-`data/expected_anomalies.csv` conterrà esattamente queste colonne, nello stesso ordine:
+`data/expected_anomalies.csv` contiene esattamente queste colonne, nello stesso ordine:
 
 | Colonna | Significato |
 |---|---|
@@ -148,15 +146,15 @@ Un campo obbligatorio mancante produrrà la sola segnalazione di completezza rel
 
 Regole di compilazione:
 
-- sarà presente una riga distinta nella ground truth per ogni segnalazione attesa;
-- la stessa `source_row_number` comparirà più volte quando una riga deve produrre più segnalazioni;
-- `id_spesa` sarà vuoto quando il caso riguarda l'assenza dell'identificativo;
-- entrambe le righe di ogni coppia duplicata avranno la propria segnalazione;
-- ogni errore intenzionale del CSV principale sarà registrato;
-- `rule_id`, `expected_status` ed `expected_message` useranno valori stabili e verificabili;
-- l'ordine sarà deterministico: prima `source_row_number`, poi `rule_id`.
+- è presente una riga distinta nella ground truth per ogni segnalazione attesa;
+- la stessa `source_row_number` compare più volte quando una riga produce più segnalazioni;
+- `id_spesa` è vuoto quando il caso riguarda l'assenza dell'identificativo;
+- entrambe le righe di ogni coppia duplicata hanno la propria segnalazione;
+- ogni errore intenzionale del CSV principale è registrato;
+- `rule_id`, `expected_status` ed `expected_message` usano valori stabili e verificabili;
+- l'ordine è deterministico: prima `source_row_number`, poi `rule_id`.
 
-Il catalogo minimo dei `rule_id` sarà:
+Il catalogo dei `rule_id` è:
 
 | `rule_id` | `expected_status` | `expected_message` |
 |---|---|---|
@@ -178,19 +176,19 @@ Il catalogo minimo dei `rule_id` sarà:
 | `POLICY_APPROVAL_REQUIRED` | `richiede approvazione` | `richiede approvazione` |
 | `POLICY_MISSING_APPROVER` | `non conforme` | `non conforme: supera soglia senza approvatore assegnato` |
 
-La non valutabilità statistica è determinata a livello di categoria. Poiché la ground truth è row-level, `STATISTICAL_NOT_EVALUABLE` sarà registrato per ciascuna delle quattro righe di `Formazione`; le due righe sopra soglia avranno inoltre le segnalazioni di policy definite nella sezione sulle sovrapposizioni.
+La non valutabilità statistica è determinata a livello di categoria. Poiché la ground truth è row-level, `STATISTICAL_NOT_EVALUABLE` è registrato per ciascuna delle quattro righe di `Formazione`; le due righe sopra soglia hanno inoltre le segnalazioni di policy definite nella sezione sulle sovrapposizioni.
 
 ## 10. Riproducibilità
 
-La futura generazione:
+Il generatore:
 
-- userà il seed fisso `20260713`;
-- produrrà sempre lo stesso ordine delle righe;
-- sovrascriverà in modo deterministico i due file generati;
-- userà la settimana fissa dal 13/07/2026 al 17/07/2026 e non dipenderà dalla data corrente;
-- non effettuerà chiamate esterne;
-- non introdurrà errori casuali non registrati nella ground truth;
-- produrrà file identici a parità di versione dello script.
+- usa il seed fisso `20260713`;
+- produce sempre lo stesso ordine delle righe;
+- sovrascrive in modo deterministico i due file generati;
+- usa la settimana fissa dal 13/07/2026 al 17/07/2026 e non dipende dalla data corrente;
+- non effettua chiamate esterne;
+- non introduce errori casuali non registrati nella ground truth;
+- produce file identici a parità di versione dello script.
 
 ## 11. Criteri di accettazione del dataset
 
@@ -208,15 +206,6 @@ La futura generazione:
 12. Due generazioni con la stessa versione dello script producono file identici byte per byte.
 13. Entrambi i file sono CSV leggibili con strumenti standard.
 
-## 12. Fuori ambito
+## 12. Confini del documento
 
-In questa fase non vengono realizzati:
-
-- motore di validazione;
-- dashboard;
-- test automatici;
-- conversione valutaria;
-- database;
-- API;
-- autenticazione;
-- integrazioni con sistemi aziendali.
+Questa specifica non definisce conversione valutaria, database, API, autenticazione o integrazioni con sistemi aziendali. Architettura applicativa, regole e test sono descritti nei rispettivi documenti tecnici.

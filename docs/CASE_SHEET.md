@@ -18,6 +18,14 @@ ORE STIMATE SENZA AI:
 LEVA:
 Circa 1,41×, calcolata come `18,0 / 12,7333`.
 
+### Lettura critica della leva
+
+La leva di 1,41× è inferiore rispetto a quella ottenibile in attività prevalentemente generative. In questo esercizio una parte significativa del tempo è stata dedicata alla definizione e alla verifica dei requisiti, alla costruzione della ground truth, al controllo delle sovrapposizioni tra regole, alla revisione dei diff e all'esecuzione di verifiche deterministiche.
+
+L'AI ha supportato analisi, implementazione, test, refactoring e documentazione, ma requisiti e vincoli sono stati verificati dall'autore e ogni output è stato esaminato prima dell'accettazione. Test e controlli hanno permesso di individuare e correggere anomalie e incoerenze, mantenendo umana la responsabilità finale. La leva rappresenta quindi una stima del tempo risparmiato: non misura la qualità, la quantità di codice prodotto o il livello di autonomia dello strumento.
+
+Nei lavori con requisiti ambigui e necessità di tracciabilità, il contributo dell'AI comprende anche l'esplorazione di alternative, l'individuazione di incoerenze e la preparazione di verifiche ripetibili, non soltanto la generazione di contenuti.
+
 TRASFERIBILITÀ:
 Alta. Il pattern loader → normalizzazione → regole → pipeline → reporting → dashboard può essere adattato ad altri controlli deterministici su file tabellari; le regole specifiche del dominio devono essere ridefinite. Non è stato ancora riutilizzato in altri progetti.
 

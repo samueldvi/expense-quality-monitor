@@ -14,6 +14,9 @@ import streamlit as st
 
 from expense_quality_monitor.config import EXPECTED_COLUMNS, FINDING_COLUMNS
 from expense_quality_monitor.loader import (
+    CSV_ERROR_DUPLICATE_COLUMNS,
+    CSV_ERROR_EMPTY,
+    CSV_ERROR_INCOMPATIBLE_SCHEMA,
     SOURCE_ROW_COLUMN,
     CsvLoadError,
     SchemaComparison,
@@ -26,7 +29,10 @@ LOGGER = logging.getLogger(__name__)
 ROOT = Path(__file__).resolve().parent
 EXAMPLE_PATH = ROOT / "data" / "synthetic_expenses.csv"
 TEMPLATE_FILENAME = "expense_quality_monitor_template.csv"
+FINDINGS_FILENAME = "expense_quality_findings.csv"
+CSV_MIME_TYPE = "text/csv"
 SECTIONS = ("Panoramica", "Segnalazioni", "Dati", "Esporta")
+DEFAULT_SECTION = SECTIONS[0]
 FILTER_KEYS = (
     "finding_search",
     "filter_types",
@@ -127,8 +133,20 @@ def reset_filters() -> None:
 
 def reset_workspace_view() -> None:
     """Return navigation and filters to their initial state after changing source."""
-    st.session_state["workspace_section"] = "Panoramica"
+    st.session_state["workspace_section"] = DEFAULT_SECTION
     reset_filters()
+
+
+def set_active_source(
+    *,
+    name: str,
+    content: bytes | None,
+    is_example: bool,
+) -> None:
+    """Store one active source without rendering or reading external data."""
+    st.session_state["source_name"] = name
+    st.session_state["source_bytes"] = content
+    st.session_state["source_is_example"] = is_example
 
 
 def activate_uploaded_source(widget_key: str) -> None:
@@ -136,18 +154,29 @@ def activate_uploaded_source(widget_key: str) -> None:
     uploaded_file = st.session_state.get(widget_key)
     if uploaded_file is None:
         return
-    st.session_state["source_name"] = uploaded_file.name
-    st.session_state["source_bytes"] = uploaded_file.getvalue()
-    st.session_state["source_is_example"] = False
+    set_active_source(
+        name=uploaded_file.name,
+        content=uploaded_file.getvalue(),
+        is_example=False,
+    )
     reset_workspace_view()
 
 
 def activate_example_source() -> None:
     """Select the versioned example without copying or changing it."""
-    st.session_state["source_name"] = EXAMPLE_PATH.name
-    st.session_state["source_bytes"] = None
-    st.session_state["source_is_example"] = True
+    set_active_source(name=EXAMPLE_PATH.name, content=None, is_example=True)
     reset_workspace_view()
+
+
+def render_example_button(*, key: str) -> None:
+    """Render the shared action that selects the versioned example."""
+    st.button(
+        "Prova con l’esempio",
+        key=key,
+        on_click=activate_example_source,
+        type="primary",
+        width="stretch",
+    )
 
 
 def current_source() -> Path | BytesIO | None:
@@ -162,9 +191,9 @@ def current_source() -> Path | BytesIO | None:
 
 def friendly_load_error(error: CsvLoadError) -> str:
     """Translate loader details into concise, actionable UI messages."""
-    if error.code == "empty":
+    if error.code == CSV_ERROR_EMPTY:
         return "Il file è vuoto."
-    if error.code == "duplicate_columns":
+    if error.code == CSV_ERROR_DUPLICATE_COLUMNS:
         return "Alcune colonne hanno lo stesso nome dopo la normalizzazione."
     return "Il contenuto non può essere letto come CSV."
 
@@ -192,17 +221,11 @@ def render_schema_guidance(schema: SchemaComparison) -> None:
             "Scarica il modello CSV",
             data=build_template_csv(),
             file_name=TEMPLATE_FILENAME,
-            mime="text/csv",
+            mime=CSV_MIME_TYPE,
             width="stretch",
         )
     with action_columns[1]:
-        st.button(
-            "Prova con l’esempio",
-            key="use_example_after_schema_error",
-            on_click=activate_example_source,
-            type="primary",
-            width="stretch",
-        )
+        render_example_button(key="use_example_after_schema_error")
 
 
 def render_header() -> None:
@@ -227,13 +250,7 @@ def render_initial_state() -> None:
             )
         with example_column:
             st.write("File di esempio")
-            st.button(
-                "Prova con l’esempio",
-                key="use_example",
-                on_click=activate_example_source,
-                type="primary",
-                width="stretch",
-            )
+            render_example_button(key="use_example")
             st.caption("data/synthetic_expenses.csv")
     st.caption("Il file viene elaborato nella sessione e non viene salvato.")
 
@@ -312,7 +329,7 @@ def render_filter_controls(enriched_findings: pd.DataFrame) -> pd.DataFrame:
     st.text_input(
         "Cerca per ID, regola o descrizione",
         key="finding_search",
-        placeholder="ID spesa, rule ID o testo",
+        placeholder="ID spesa, ID regola o testo",
     )
     filter_columns = st.columns(4)
     with filter_columns[0]:
@@ -396,6 +413,18 @@ def current_filter_description() -> str:
     return " · ".join(descriptions) if descriptions else "Nessun filtro attivo"
 
 
+def render_findings_download(findings: pd.DataFrame, *, key: str) -> None:
+    """Render the shared CSV download for one findings view."""
+    st.download_button(
+        "Scarica la vista corrente",
+        data=findings_to_csv(findings.loc[:, FINDING_COLUMNS]),
+        file_name=FINDINGS_FILENAME,
+        mime=CSV_MIME_TYPE,
+        type="primary",
+        key=key,
+    )
+
+
 def render_findings(result: AnalysisResult, enriched_findings: pd.DataFrame) -> pd.DataFrame:
     """Render the primary findings workspace and return its current view."""
     st.subheader("Segnalazioni")
@@ -404,13 +433,7 @@ def render_findings(result: AnalysisResult, enriched_findings: pd.DataFrame) -> 
     if filtered.empty:
         st.info("Nessun risultato con i filtri attuali.")
     findings_table(filtered)
-    st.download_button(
-        "Scarica la vista corrente",
-        data=findings_to_csv(filtered.loc[:, FINDING_COLUMNS]),
-        file_name="expense_quality_findings.csv",
-        mime="text/csv",
-        type="primary",
-    )
+    render_findings_download(filtered, key="findings_download")
     return filtered
 
 
@@ -441,13 +464,7 @@ def render_export(filtered: pd.DataFrame) -> None:
     if filtered.empty:
         st.info("La vista corrente non contiene righe da esportare.")
         return
-    st.download_button(
-        "Scarica la vista corrente",
-        data=findings_to_csv(filtered.loc[:, FINDING_COLUMNS]),
-        file_name="expense_quality_findings.csv",
-        mime="text/csv",
-        type="primary",
-    )
+    render_findings_download(filtered, key="export_download")
 
 
 def analyze_current_source() -> AnalysisResult | None:
@@ -459,7 +476,7 @@ def analyze_current_source() -> AnalysisResult | None:
         with st.spinner("Analisi in corso"):
             return analyze_expenses(source)
     except CsvLoadError as error:
-        if error.code == "incompatible_schema" and error.schema is not None:
+        if error.code == CSV_ERROR_INCOMPATIBLE_SCHEMA and error.schema is not None:
             render_schema_guidance(error.schema)
         else:
             st.warning(friendly_load_error(error))
@@ -490,11 +507,14 @@ def render_dashboard() -> None:
     render_file_context(source_name, len(result.source_data))
     extra_columns = source_extra_columns(result.source_data)
     if extra_columns:
-        st.info(
-            f"Il file contiene {len(extra_columns)} colonne aggiuntive "
-            "che non vengono utilizzate nell’analisi."
+        extra_count = len(extra_columns)
+        extra_description = (
+            "colonna aggiuntiva che non viene utilizzata"
+            if extra_count == 1
+            else "colonne aggiuntive che non vengono utilizzate"
         )
-    st.session_state.setdefault("workspace_section", "Panoramica")
+        st.info(f"Il file contiene {extra_count} {extra_description} nell’analisi.")
+    st.session_state.setdefault("workspace_section", DEFAULT_SECTION)
     section = st.segmented_control(
         "Sezione",
         SECTIONS,

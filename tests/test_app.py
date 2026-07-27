@@ -2,6 +2,7 @@
 
 from io import StringIO
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import patch
 
 import pandas as pd
@@ -10,11 +11,14 @@ from streamlit.testing.v1 import AppTest
 
 from app import (
     TEMPLATE_FILENAME,
+    activate_example_source,
+    activate_uploaded_source,
     build_template_csv,
     counts_to_frame,
     distinct_rule_count,
     filter_findings,
     findings_with_categories,
+    render_findings_download,
     reset_workspace_view,
 )
 from expense_quality_monitor.config import EXPECTED_COLUMNS, FINDING_COLUMNS
@@ -275,6 +279,28 @@ def test_source_change_restores_overview_and_clears_filters() -> None:
     }
 
 
+def test_upload_and_example_store_the_same_source_keys() -> None:
+    uploaded_state = {
+        "upload": SimpleNamespace(name="spese.csv", getvalue=lambda: b"contenuto"),
+    }
+    with patch("app.st.session_state", uploaded_state):
+        activate_uploaded_source("upload")
+
+    example_state: dict[str, object] = {}
+    with patch("app.st.session_state", example_state):
+        activate_example_source()
+
+    source_keys = {"source_name", "source_bytes", "source_is_example"}
+    assert source_keys <= uploaded_state.keys()
+    assert source_keys <= example_state.keys()
+    assert uploaded_state["source_name"] == "spese.csv"
+    assert uploaded_state["source_bytes"] == b"contenuto"
+    assert uploaded_state["source_is_example"] is False
+    assert example_state["source_name"] == "synthetic_expenses.csv"
+    assert example_state["source_bytes"] is None
+    assert example_state["source_is_example"] is True
+
+
 def test_distinct_rules_are_calculated_from_current_findings() -> None:
     result = analyze_expenses(EXAMPLE_PATH)
 
@@ -296,6 +322,24 @@ def test_filtered_export_preserves_confirmed_schema_and_content() -> None:
     assert exported == expected
     assert parsed.columns.tolist() == list(FINDING_COLUMNS)
     assert len(parsed) == 4
+
+
+def test_findings_download_preserves_public_csv_contract() -> None:
+    result = analyze_expenses(EXAMPLE_PATH)
+    filtered = result.findings[result.findings["anomaly_type"].eq("policy")].reset_index(drop=True)
+    expected = findings_to_csv(filtered.loc[:, FINDING_COLUMNS])
+
+    with patch("app.st.download_button") as download_button:
+        render_findings_download(filtered, key="test_download")
+
+    download_button.assert_called_once_with(
+        "Scarica la vista corrente",
+        data=expected,
+        file_name="expense_quality_findings.csv",
+        mime="text/csv",
+        type="primary",
+        key="test_download",
+    )
 
 
 def test_data_and_export_sections_present_factual_context() -> None:

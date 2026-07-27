@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "expense-quality-monitor"
 version = "0.1.0"
-description = "Deterministic quality monitoring for synthetic expense data"
+description = "Controlli deterministici di qualità per file CSV di spese"
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
