@@ -6,7 +6,9 @@
 
 ## TL;DR
 
-Expense Quality Monitor riceve un CSV di spese, applica controlli deterministici e produce segnalazioni motivate, riepiloghi ed export filtrabili. È pensato per amministrazione, finance e controllo di gestione, con risultati consultabili attraverso una dashboard.
+Expense Quality Monitor riceve un CSV di spese, applica controlli deterministici e produce
+segnalazioni motivate, riepiloghi ed export filtrabili. È pensato per amministrazione,
+finance e controllo di gestione e offre un'interfaccia in italiano e inglese.
 
 ## Demo online
 
@@ -41,6 +43,10 @@ Il progetto applica le stesse regole a ogni esecuzione e restituisce una vista o
 - controlli di completezza, validità, unicità, statistica e policy;
 - ricerca e filtri sulle segnalazioni;
 - dashboard con metriche e riepiloghi;
+- Profilo dati per colonna e Dizionario dati dei dieci campi canonici;
+- Governance locale con metadati, SHA-256, catalogo delle 17 regole e riepilogo per
+  dimensione;
+- responsabilità facoltative conservate soltanto nella sessione corrente;
 - export CSV della vista corrente.
 
 ## Come funziona
@@ -50,9 +56,10 @@ Il progetto applica le stesse regole a ogni esecuzione e restituisce una vista o
 1. caricamento del CSV;
 2. validazione dello schema;
 3. normalizzazione dei valori di lavoro;
-4. esecuzione delle regole deterministiche;
-5. generazione delle segnalazioni;
-6. analisi dei risultati ed export.
+4. esecuzione coordinata delle 17 regole;
+5. generazione delle segnalazioni e dei riepiloghi;
+6. consultazione di risultati, Profilo dati, Dizionario dati e Governance;
+7. esportazione canonica delle segnalazioni.
 
 ## Struttura del CSV
 
@@ -109,14 +116,18 @@ python -m ruff check .
 python -m ruff format --check .
 ```
 
-La versione corrente dispone di 77 test automatici. GitHub Actions rigenera il dataset, verifica la ground truth ed esegue test, Ruff, Bandit e compilazione dei sorgenti. A parità di input e versione, la pipeline produce risultati deterministici.
+La versione corrente dispone di 240 test automatici. GitHub Actions rigenera il dataset,
+verifica la ground truth ed esegue test, Ruff, Bandit, compilazione dei sorgenti e controllo
+delle dipendenze installate. A parità di input e versione, la pipeline produce risultati
+deterministici.
 
 ## Architettura
 
 Il progetto è un monolite modulare: l’interfaccia coordina componenti separati, mentre regole e reporting restano indipendenti dalla dashboard.
 
 ```text
-loader → normalizzazione → regole → pipeline → reporting → dashboard
+loader → normalizzazione → regole → pipeline → reporting
+                         ↘ profiling e governance → i18n e tema → Streamlit
 ```
 
 Responsabilità, scelte e alternative sono descritte nel [design della soluzione](docs/design.md).
@@ -136,8 +147,12 @@ Per le convenzioni di sviluppo e il processo di revisione, consultare
 - nessuno storico persistente;
 - nessuna autenticazione;
 - nessun database;
+- metadati di responsabilità limitati alla sessione e non salvati;
+- Governance locale, non una piattaforma aziendale completa di data governance;
+- `app.py` resta un monolite UI di dimensione significativa;
 - nessuna conversione valutaria;
 - nessuna integrazione con sistemi aziendali;
+- nessuna AI nel runtime;
 - validazione eseguita su un dataset controllato.
 
 ## Documentazione

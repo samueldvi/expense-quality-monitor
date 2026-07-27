@@ -28,8 +28,9 @@ Il flusso applicativo è:
 5. applicazione delle regole;
 6. produzione della tabella delle segnalazioni;
 7. calcolo del riepilogo;
-8. visualizzazione tramite Streamlit;
-9. esportazione CSV delle segnalazioni.
+8. costruzione di Profilo dati, Dizionario dati e viste di Governance;
+9. localizzazione e presentazione tramite Streamlit;
+10. esportazione CSV delle segnalazioni canoniche.
 
 ### Stack
 
@@ -59,8 +60,11 @@ expense-quality-monitor/
 │   └── expense_quality_monitor/
 │       ├── __init__.py
 │       ├── config.py
+│       ├── governance.py
+│       ├── i18n.py
 │       ├── loader.py
 │       ├── normalization.py
+│       ├── profiling.py
 │       ├── rules/
 │       │   ├── __init__.py
 │       │   ├── completeness.py
@@ -69,7 +73,8 @@ expense-quality-monitor/
 │       │   ├── statistical.py
 │       │   └── policy.py
 │       ├── pipeline.py
-│       └── reporting.py
+│       ├── reporting.py
+│       └── ui_theme.py
 └── tests/
 ```
 
@@ -87,7 +92,18 @@ Responsabilità dei componenti:
 - `rules/policy.py`: soglie, richieste di approvazione e non conformità.
 - `pipeline.py`: ordinamento ed esecuzione coordinata delle fasi, senza duplicare le singole regole.
 - `reporting.py`: riepiloghi, ordinamento delle segnalazioni ed esportazione CSV.
+- `profiling.py`: metriche strutturali, profilo per colonna e Dizionario dati canonico,
+  senza rendering.
+- `governance.py`: metadati immutabili dell'elaborazione, SHA-256, catalogo tecnico delle
+  regole e riepilogo per dimensione, senza dipendenze da Streamlit o traduzioni.
+- `i18n.py`: cataloghi italiano e inglese, rilevamento del locale e funzioni di
+  localizzazione della presentazione.
+- `ui_theme.py`: ruoli, colori e icone semantiche, senza logica di analisi.
 - `tests/`: test unitari, di integrazione e di regressione.
+
+`app.py` coordina la navigazione, i widget e lo stato della sessione. Le copie localizzate
+dei DataFrame sono create esclusivamente per la presentazione: `AnalysisResult`, ground
+truth ed export mantengono valori e colonne canonici.
 
 ## 5. Modello dei dati
 
@@ -163,19 +179,25 @@ La pipeline distingue tre esiti:
 
 Gli errori tecnici completi possono essere registrati localmente per lo sviluppo, senza includere contenuti sensibili del CSV nell'interfaccia.
 
-## 9. Dashboard
+## 9. Dashboard e stato di sessione
 
 La dashboard Streamlit comprende:
 
 - caricamento del CSV;
-- numero totale di righe;
-- numero di righe con almeno una segnalazione;
-- conteggi per tipo e stato;
-- riepilogo per categoria;
-- tabella filtrabile delle anomalie;
+- navigazione stabile tra Panoramica, Segnalazioni, Profilo dati, Governance, Dati ed
+  Esporta;
+- interfaccia in italiano e inglese con scelta persistente nella sessione;
+- metriche, conteggi per tipo e stato e riepilogo per categoria;
+- tabella ricercabile e filtrabile delle anomalie;
+- profilo per colonna e Dizionario dati dei dieci campi canonici;
+- metadati dell'elaborazione, fingerprint SHA-256, catalogo delle 17 regole e riepilogo
+  delle cinque dimensioni di qualità;
+- responsabilità facoltative conservate soltanto nello stato della sessione;
 - download CSV delle segnalazioni.
 
-La logica di analisi resta nei moduli applicativi e non nell'interfaccia.
+Il cambio di lingua o sezione conserva sorgente, risultati, filtri, timestamp e
+responsabilità. Il cambio della sorgente crea nuovi metadati e azzera le responsabilità
+facoltative. La logica di analisi resta nei moduli applicativi e non nell'interfaccia.
 
 ## 10. Strategia di test
 
@@ -199,7 +221,14 @@ I test verificano sia le segnalazioni attese sia l'assenza di segnalazioni aggiu
 - Il contenuto del CSV viene trattato come dato e non viene mai eseguito.
 - Un limite configurabile alla dimensione del caricamento resta un miglioramento futuro.
 - L'esportazione neutralizza valori testuali che potrebbero essere interpretati come formule dai fogli di calcolo.
-- La CI esegue pytest, ruff e bandit.
+- La CI rigenera e confronta i dataset, quindi esegue pytest, Ruff, Bandit, compileall e
+  `pip check`.
+- Il timestamp UTC descrive l'elaborazione corrente, resta separato da `AnalysisResult` e
+  non entra nella ground truth o nell'export.
+- Il fingerprint SHA-256 è calcolato sui byte originali del file, non su una
+  serializzazione del DataFrame.
+- Le responsabilità facoltative non sono persistite e non costituiscono assegnazioni
+  aziendali.
 - I commit descrivono il contenuto della modifica secondo le convenzioni definite in
   `CONTRIBUTING.md`; l'assistenza AI è documentata come parte del processo di revisione e
   non come categoria del commit.
@@ -225,3 +254,13 @@ I test verificano sia le segnalazioni attese sia l'assenza di segnalazioni aggiu
 - CD;
 - microservizi;
 - modelli AI nel runtime.
+
+## 14. Limiti tecnici correnti
+
+- Non esistono persistenza, autenticazione o lineage operativo persistente.
+- Timestamp e responsabilità appartengono esclusivamente alla sessione corrente.
+- La Governance rende visibili informazioni locali e deterministiche, ma non costituisce
+  una piattaforma aziendale completa di data governance.
+- `app.py` supera 1.400 righe e resta un monolite UI di dimensione significativa. La
+  separazione futura dei renderer è una possibile manutenzione, non parte di questo audit.
+- L'analisi riguarda un solo file settimanale per volta e non mantiene uno storico.

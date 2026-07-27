@@ -82,6 +82,37 @@ Realizzare uno strumento che riceva un file di note spese, esegua automaticament
 - Mostrare in un piccolo cruscotto un riepilogo delle anomalie della settimana.
 - Utilizzare il dataset sintetico incluso nel repository, che contiene volutamente valori nulli, duplicati, importi anomali e formati errati.
 
+### Interfaccia e localizzazione
+
+- Rendere l'interfaccia disponibile in italiano e inglese.
+- Rilevare il locale iniziale tra le lingue supportate e consentire una scelta esplicita
+  mantenuta nella sessione.
+- Conservare file, sezione, filtri, risultati ed export durante il cambio lingua.
+- Mantenere canonici e non tradotti nomi delle colonne CSV, `rule_id` e valori esportati;
+  localizzare soltanto la presentazione.
+
+### Profilo dati e Dizionario dati
+
+- Mostrare un profilo per colonna con completezza, valori distinti, tipi osservati e
+  attesi, intervalli validi e segnalazioni correlate.
+- Mostrare un Dizionario dati derivato dalla configurazione canonica dei dieci campi,
+  includendo obbligatorietà, formato, valori ammessi e regole applicabili.
+- Calcolare profilo e dizionario senza modificare i DataFrame canonici dell'analisi.
+
+### Governance locale
+
+- Mostrare nome, dimensione e formato della sorgente, timestamp UTC dell'elaborazione,
+  conteggi strutturali, colonne aggiuntive e versione applicativa disponibile.
+- Calcolare un fingerprint SHA-256 sui byte originali del file.
+- Mostrare il catalogo delle 17 regole derivato dalle fonti canoniche, con dimensione di
+  qualità, stato prodotto, campi e parametri effettivi.
+- Riepilogare numero di regole, segnalazioni e righe coinvolte per le cinque dimensioni
+  supportate: completezza, validità, unicità, anomalia statistica e conformità alle policy.
+- Consentire l'inserimento facoltativo di data owner, data steward, unità organizzativa,
+  periodo e note, conservandoli esclusivamente nella sessione corrente.
+- Non includere timestamp o responsabilità nella ground truth o nell'export delle
+  segnalazioni.
+
 ## Criteri di accettazione
 
 1. Un CSV privo di una colonna prevista viene segnalato indicando la colonna mancante.
@@ -97,6 +128,15 @@ Realizzare uno strumento che riceva un file di note spese, esegua automaticament
 11. Una spesa sopra soglia con `approvatore` valorizzato non viene classificata come non conforme per questa regola.
 12. Una spesa sopra soglia con `approvatore` vuoto riceve il messaggio `non conforme: supera soglia senza approvatore assegnato`.
 13. Anomalia statistica, richiesta di approvazione e non conformità rimangono classificazioni distinte.
+14. L'interfaccia è utilizzabile in italiano e inglese senza alterare i valori canonici
+    esportati.
+15. Il Profilo dati e il Dizionario dati riportano i dieci campi canonici e derivano dalle
+    configurazioni applicative.
+16. Il fingerprint mostrato coincide con lo SHA-256 dei byte originali della sorgente.
+17. Il catalogo contiene esattamente i 17 `rule_id` configurati e il riepilogo usa soltanto
+    le cinque dimensioni supportate.
+18. Le responsabilità sono facoltative, persistono tra lingua e sezione nella stessa
+    sessione e vengono azzerate quando cambia sorgente.
 
 ## Requisiti non funzionali
 
@@ -106,6 +146,8 @@ Realizzare uno strumento che riceva un file di note spese, esegua automaticament
 - La dashboard può essere leggera; la perfezione estetica non è un obiettivo della valutazione.
 - Le ore impiegate devono essere registrate in modo effettivo, senza stime retrospettive.
 - La documentazione deve comunicare in modo trasparente assunzioni, uso dell'AI e correzioni critiche dei suoi output.
+- Metadati e responsabilità della Governance non devono essere salvati automaticamente né
+  inviati a servizi esterni.
 
 ## Vincoli di governance
 
