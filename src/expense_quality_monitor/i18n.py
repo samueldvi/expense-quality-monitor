@@ -222,8 +222,10 @@ ITALIAN_TRANSLATIONS = _build_catalog(
         ("governance.parameter.policy_thresholds", "Soglie: {values}"),
         (
             "governance.responsibility.notice",
-            "Questi metadati restano nella sessione corrente e non costituiscono un "
-            "sistema aziendale di assegnazione delle responsabilità.",
+            (
+                "Questi metadati restano nella sessione corrente e non costituiscono un "
+                "sistema aziendale di assegnazione delle responsabilità."
+            ),
         ),
         ("governance.responsibility.owner", "Data owner"),
         ("governance.responsibility.steward", "Data steward"),
@@ -597,8 +599,10 @@ ENGLISH_TRANSLATIONS = _build_catalog(
         ("governance.parameter.policy_thresholds", "Thresholds: {values}"),
         (
             "governance.responsibility.notice",
-            "This metadata remains in the current session and does not constitute an "
-            "enterprise responsibility assignment system.",
+            (
+                "This metadata remains in the current session and does not constitute an "
+                "enterprise responsibility assignment system."
+            ),
         ),
         ("governance.responsibility.owner", "Data owner"),
         ("governance.responsibility.steward", "Data steward"),

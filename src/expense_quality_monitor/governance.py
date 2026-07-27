@@ -18,7 +18,7 @@ from expense_quality_monitor.config import (
     RULE_CATALOG,
     RULE_TARGET_FIELDS,
 )
-from expense_quality_monitor.loader import CsvFormatMetadata, SOURCE_ROW_COLUMN
+from expense_quality_monitor.loader import SOURCE_ROW_COLUMN, CsvFormatMetadata
 from expense_quality_monitor.profiling import DataProfile
 
 PACKAGE_NAME = "expense-quality-monitor"

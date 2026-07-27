@@ -21,8 +21,8 @@ from expense_quality_monitor.governance import (
     build_dimension_summary,
     build_processing_metadata,
     build_rule_catalog,
-    filter_rule_catalog,
     calculate_sha256,
+    filter_rule_catalog,
 )
 from expense_quality_monitor.loader import CsvFormatMetadata
 from expense_quality_monitor.profiling import DataProfile
@@ -107,7 +107,7 @@ def test_processing_metadata_rejects_a_naive_timestamp() -> None:
             content=b"a,b\n1,2\n",
             profile=sample_profile(),
             csv_format=CsvFormatMetadata(",", "utf-8", False),
-            analyzed_at_utc=datetime(2026, 7, 27, 10, 30),
+            analyzed_at_utc=datetime.fromisoformat("2026-07-27T10:30:00"),
             installed_version=None,
         )
 

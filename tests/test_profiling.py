@@ -100,7 +100,7 @@ def test_data_profile_is_deeply_immutable_for_its_declared_fields() -> None:
 
     assert isinstance(profile.extra_columns, tuple)
     with pytest.raises(FrozenInstanceError):
-        setattr(profile, "row_count", 5)
+        profile.row_count = 5  # type: ignore[misc]
 
 
 def test_data_profile_ignores_findings_without_a_valid_source_row() -> None:
