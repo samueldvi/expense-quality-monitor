@@ -461,7 +461,7 @@ def render_schema_guidance(schema: SchemaComparison) -> None:
 
 def render_header() -> None:
     """Render a compact product hero with a local, descriptive illustration."""
-    text_column, image_column = st.columns([3, 1], gap="large", vertical_alignment="center")
+    text_column, image_column = st.columns([3, 1], gap="large")
     with text_column:
         st.title(tr("app.title"))
         st.write(tr("app.subtitle"))
