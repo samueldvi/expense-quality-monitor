@@ -97,6 +97,71 @@ def test_visual_status_copy_exists_in_both_languages(key: str) -> None:
     assert i18n.translate(key, "en")
 
 
+@pytest.mark.parametrize(
+    "key",
+    [
+        "nav.profile",
+        "profile.title",
+        "profile.tab.column_profile",
+        "profile.tab.data_dictionary",
+        "profile.metric.source_columns",
+        "profile.table.completeness",
+        "dictionary.technical_name",
+        "dictionary.dimensions",
+        "column.id_spesa.description",
+        "column.approvatore.description",
+        "dimension.policy_compliance",
+        "type.decimal",
+        "format.date_ddmmyyyy",
+        "common.not_applicable",
+    ],
+)
+def test_profile_and_dictionary_copy_exists_in_both_languages(key: str) -> None:
+    assert i18n.translate(key, "it")
+    assert i18n.translate(key, "en")
+
+
+def test_extra_column_copy_uses_explicit_singular_and_plural_forms() -> None:
+    assert (
+        i18n.translate("profile.extra.one", "it", columns="extra_note")
+        == "Colonna aggiuntiva: extra_note"
+    )
+    assert (
+        i18n.translate("profile.extra.many", "en", columns="first, second")
+        == "Extra columns: first, second"
+    )
+
+
+@pytest.mark.parametrize(
+    ("key", "italian", "english"),
+    [
+        ("profile.table.distinct", "Valori distinti", "Distinct values"),
+        ("profile.table.source_type", "Tipo sorgente", "Source type"),
+        ("profile.table.expected_type", "Tipo atteso", "Expected type"),
+        ("dimension.completeness", "Completezza", "Completeness"),
+        ("dimension.validity", "Validità", "Validity"),
+        ("dimension.uniqueness", "Unicità", "Uniqueness"),
+        (
+            "dimension.statistical_anomaly",
+            "Anomalie statistiche",
+            "Statistical anomalies",
+        ),
+        (
+            "dimension.policy_compliance",
+            "Conformità alle policy",
+            "Policy compliance",
+        ),
+    ],
+)
+def test_profile_terms_have_explicit_equivalent_meanings(
+    key: str,
+    italian: str,
+    english: str,
+) -> None:
+    assert i18n.translate(key, "it") == italian
+    assert i18n.translate(key, "en") == english
+
+
 def test_catalog_builder_rejects_duplicate_keys() -> None:
     with pytest.raises(ValueError, match="Duplicate translation key: repeated"):
         i18n._build_catalog((("repeated", "first"), ("repeated", "second")))

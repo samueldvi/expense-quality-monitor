@@ -26,12 +26,19 @@ from expense_quality_monitor.loader import (
     compare_schema,
 )
 from expense_quality_monitor.pipeline import AnalysisResult, analyze_expenses
+from expense_quality_monitor.profiling import (
+    DataProfile,
+    build_column_profile,
+    build_data_dictionary,
+    build_data_profile,
+)
 from expense_quality_monitor.reporting import findings_to_csv
 from expense_quality_monitor.ui_theme import (
     chart_color_for_status,
     role_icon,
     semantic_role_for_status,
     status_cell_style,
+    theme_tokens,
 )
 
 LOGGER = logging.getLogger(__name__)
@@ -41,7 +48,7 @@ HERO_PATH = ROOT / "docs" / "assets" / "dashboard-hero.svg"
 TEMPLATE_FILENAME = "expense_quality_monitor_template.csv"
 FINDINGS_FILENAME = "expense_quality_findings.csv"
 CSV_MIME_TYPE = "text/csv"
-SECTION_IDS = ("overview", "findings", "data", "export")
+SECTION_IDS = ("overview", "findings", "profile", "data", "export")
 DEFAULT_SECTION = SECTION_IDS[0]
 SECTION_WIDGET_KEY = "workspace_section_widget"
 FILTER_KEYS = (
@@ -60,6 +67,18 @@ TABLE_COLUMNS = (
     "message",
     "original_value",
     "rule_id",
+)
+DICTIONARY_TABLE_COLUMNS = (
+    "technical_name",
+    "display_name",
+    "description",
+    "required",
+    "expected_type",
+    "format",
+    "allowed_values",
+    "example",
+    "rules",
+    "dimensions",
 )
 ANOMALY_TYPE_KEYS = {
     "completezza": "finding.type.completezza",
@@ -84,6 +103,7 @@ STATUS_KEYS = {
 SECTION_ICONS = {
     "overview": "▦",
     "findings": "⚑",
+    "profile": "◫",
     "data": "▤",
     "export": "⇩",
 }
@@ -509,7 +529,10 @@ def render_overview(result: AnalysisResult) -> None:
             lambda value: localized_value(value, ANOMALY_TYPE_KEYS, language),
             count_label,
         )
-        st.bar_chart(anomaly_frame, x=type_label, y=count_label, height=260)
+        if anomaly_frame.empty:
+            st.caption(tr("status.no_findings"))
+        else:
+            st.bar_chart(anomaly_frame, x=type_label, y=count_label, height=260)
     with status_column:
         st.subheader(f"◉ {tr('overview.findings_by_status')}")
         status_label = tr("common.status")
@@ -526,36 +549,39 @@ def render_overview(result: AnalysisResult) -> None:
             status_rows,
             columns=[status_label, count_label, "_color"],
         )
-        st.vega_lite_chart(
-            status_frame,
-            spec={
-                "mark": {"type": "bar", "cornerRadiusEnd": 4},
-                "encoding": {
-                    "x": {
-                        "field": status_label,
-                        "type": "nominal",
-                        "axis": {"labelAngle": -35, "title": status_label},
-                        "sort": None,
+        if status_frame.empty:
+            st.caption(tr("status.no_findings"))
+        else:
+            st.vega_lite_chart(
+                status_frame,
+                spec={
+                    "mark": {"type": "bar", "cornerRadiusEnd": 4},
+                    "encoding": {
+                        "x": {
+                            "field": status_label,
+                            "type": "nominal",
+                            "axis": {"labelAngle": -35, "title": status_label},
+                            "sort": None,
+                        },
+                        "y": {
+                            "field": count_label,
+                            "type": "quantitative",
+                            "title": count_label,
+                        },
+                        "color": {
+                            "field": "_color",
+                            "type": "nominal",
+                            "scale": None,
+                            "legend": None,
+                        },
+                        "tooltip": [
+                            {"field": status_label, "type": "nominal"},
+                            {"field": count_label, "type": "quantitative"},
+                        ],
                     },
-                    "y": {
-                        "field": count_label,
-                        "type": "quantitative",
-                        "title": count_label,
-                    },
-                    "color": {
-                        "field": "_color",
-                        "type": "nominal",
-                        "scale": None,
-                        "legend": None,
-                    },
-                    "tooltip": [
-                        {"field": status_label, "type": "nominal"},
-                        {"field": count_label, "type": "quantitative"},
-                    ],
                 },
-            },
-            height=260,
-        )
+                height=260,
+            )
 
     st.subheader(f"▦ {tr('overview.categories')}")
     st.dataframe(
@@ -751,6 +777,233 @@ def render_data(result: AnalysisResult, source_name: str) -> None:
     st.dataframe(source_view.head(50), hide_index=True, width="stretch", height=480)
 
 
+def _localized_column_profile(profile: pd.DataFrame, language: str) -> pd.DataFrame:
+    """Return a localized presentation copy of the stable column profile."""
+    presented = profile.copy()
+    presented["column_kind"] = presented["column_kind"].map(
+        lambda value: i18n.translate(f"profile.table.{value}_value", language)
+    )
+    presented["expected_type"] = presented["expected_type"].map(
+        lambda value: (
+            i18n.translate(f"type.{value}", language)
+            if isinstance(value, str)
+            else i18n.translate("common.not_applicable", language)
+        )
+    )
+    for column in ("minimum_valid", "maximum_valid"):
+        presented[column] = presented[column].fillna(
+            i18n.translate("common.not_applicable", language)
+        )
+    return presented
+
+
+def _localized_data_dictionary(
+    dictionary: pd.DataFrame,
+    language: str,
+) -> pd.DataFrame:
+    """Return a localized presentation copy of canonical dictionary records."""
+    no_values = i18n.translate("common.none", language)
+    records = []
+    for _, metadata in dictionary.iterrows():
+        records.append(
+            {
+                "technical_name": metadata["technical_name"],
+                "display_name": i18n.translate(metadata["label_key"], language),
+                "description": i18n.translate(metadata["description_key"], language),
+                "required": i18n.translate(
+                    "common.yes" if metadata["required"] else "common.no",
+                    language,
+                ),
+                "expected_type": i18n.translate(
+                    f"type.{metadata['expected_type']}",
+                    language,
+                ),
+                "format": i18n.translate(metadata["format_key"], language),
+                "allowed_values": ", ".join(metadata["allowed_values"]) or no_values,
+                "example": metadata["example"],
+                "rules": ", ".join(metadata["rules"]) or no_values,
+                "dimensions": (
+                    ", ".join(
+                        i18n.translate(f"dimension.{dimension}", language)
+                        for dimension in metadata["dimensions"]
+                    )
+                    or no_values
+                ),
+            }
+        )
+    return pd.DataFrame.from_records(records, columns=DICTIONARY_TABLE_COLUMNS)
+
+
+def _render_profile_summary(profile: DataProfile) -> None:
+    """Render profile KPIs and factual rule-result counts."""
+    metric_columns = st.columns(4)
+    metric_columns[0].metric(
+        tr("profile.metric.source_columns"),
+        profile.source_column_count,
+        border=True,
+    )
+    metric_columns[1].metric(
+        tr("profile.metric.canonical_columns"),
+        profile.canonical_column_count,
+        border=True,
+    )
+    metric_columns[2].metric(
+        tr("profile.metric.extra_columns"),
+        len(profile.extra_columns),
+        border=True,
+    )
+    metric_columns[3].metric(
+        tr("profile.metric.rows_with_findings"),
+        profile.rows_with_findings,
+        border=True,
+    )
+    st.caption(
+        " · ".join(
+            (
+                f"{tr('profile.summary.rows')}: {profile.row_count}",
+                f"{tr('profile.summary.findings')}: {profile.finding_count}",
+                (f"{tr('profile.summary.duplicate_id_rows')}: {profile.duplicate_id_rows}"),
+                (
+                    f"{tr('profile.summary.logical_duplicate_rows')}: "
+                    f"{profile.logical_duplicate_rows}"
+                ),
+                (f"{tr('profile.summary.validity_findings')}: {profile.validity_finding_count}"),
+            )
+        )
+    )
+    if profile.extra_columns:
+        extra_key = "profile.extra.one" if len(profile.extra_columns) == 1 else "profile.extra.many"
+        st.warning(
+            tr(extra_key, columns=", ".join(profile.extra_columns)),
+            icon=":material/info:",
+        )
+
+
+def _render_column_profile(column_profile: pd.DataFrame, language: str) -> None:
+    """Render the localized profile table and informational completeness chart."""
+    table = _localized_column_profile(column_profile, language)
+    st.dataframe(
+        table,
+        hide_index=True,
+        width="stretch",
+        column_config={
+            "technical_name": st.column_config.TextColumn(tr("profile.table.technical_name")),
+            "column_kind": st.column_config.TextColumn(tr("profile.table.canonical")),
+            "missing_values": st.column_config.NumberColumn(tr("profile.table.missing")),
+            "completeness_percentage": st.column_config.ProgressColumn(
+                tr("profile.table.completeness"),
+                min_value=0,
+                max_value=100,
+                format="%.2f%%",
+            ),
+            "distinct_values": st.column_config.NumberColumn(tr("profile.table.distinct")),
+            "source_dtype": st.column_config.TextColumn(tr("profile.table.source_type")),
+            "expected_type": st.column_config.TextColumn(tr("profile.table.expected_type")),
+            "related_findings": st.column_config.NumberColumn(tr("profile.table.related_findings")),
+            "minimum_valid": st.column_config.TextColumn(tr("profile.table.minimum")),
+            "maximum_valid": st.column_config.TextColumn(tr("profile.table.maximum")),
+        },
+    )
+    st.subheader(tr("profile.chart.completeness"))
+    chart_data = table[["technical_name", "completeness_percentage", "column_kind"]].copy()
+    canonical_label = tr("profile.table.canonical_value")
+    chart_data["_color"] = chart_data["column_kind"].map(
+        lambda value: theme_tokens(
+            "information" if value == canonical_label else "warning",
+            current_theme(),
+        )["border"]
+    )
+    st.vega_lite_chart(
+        chart_data,
+        spec={
+            "mark": {"type": "bar", "cornerRadiusEnd": 4},
+            "encoding": {
+                "x": {
+                    "field": "technical_name",
+                    "type": "nominal",
+                    "sort": None,
+                    "title": tr("profile.table.technical_name"),
+                },
+                "y": {
+                    "field": "completeness_percentage",
+                    "type": "quantitative",
+                    "scale": {"domain": [0, 100]},
+                    "title": tr("profile.table.completeness"),
+                },
+                "color": {
+                    "field": "_color",
+                    "type": "nominal",
+                    "scale": None,
+                    "legend": None,
+                },
+                "tooltip": [
+                    {
+                        "field": "technical_name",
+                        "type": "nominal",
+                        "title": tr("profile.table.technical_name"),
+                    },
+                    {
+                        "field": "completeness_percentage",
+                        "type": "quantitative",
+                        "title": tr("profile.table.completeness"),
+                    },
+                    {
+                        "field": "column_kind",
+                        "type": "nominal",
+                        "title": tr("profile.table.canonical"),
+                    },
+                ],
+            },
+        },
+        height=300,
+    )
+
+
+def _render_data_dictionary(dictionary: pd.DataFrame, language: str) -> None:
+    """Render localized canonical column metadata."""
+    presented = _localized_data_dictionary(dictionary, language)
+    st.subheader(tr("dictionary.title"))
+    st.dataframe(
+        presented,
+        hide_index=True,
+        width="stretch",
+        column_config={
+            "technical_name": st.column_config.TextColumn(tr("dictionary.technical_name")),
+            "display_name": st.column_config.TextColumn(tr("dictionary.display_name")),
+            "description": st.column_config.TextColumn(tr("dictionary.description")),
+            "required": st.column_config.TextColumn(tr("dictionary.required")),
+            "expected_type": st.column_config.TextColumn(tr("dictionary.expected_type")),
+            "format": st.column_config.TextColumn(tr("dictionary.format")),
+            "allowed_values": st.column_config.TextColumn(tr("dictionary.allowed_values")),
+            "example": st.column_config.TextColumn(tr("dictionary.example")),
+            "rules": st.column_config.TextColumn(tr("dictionary.rules")),
+            "dimensions": st.column_config.TextColumn(tr("dictionary.dimensions")),
+        },
+    )
+
+
+def render_profile(result: AnalysisResult) -> None:
+    """Render deterministic structural profiling and the canonical dictionary."""
+    language = current_language()
+    profile = build_data_profile(result.source_data, result.findings)
+    column_profile = build_column_profile(result.source_data, result.findings)
+    dictionary = build_data_dictionary()
+
+    st.subheader(f"{SECTION_ICONS['profile']} {tr('profile.title')}")
+    st.write(tr("profile.description"))
+    _render_profile_summary(profile)
+    column_tab, dictionary_tab = st.tabs(
+        (
+            tr("profile.tab.column_profile"),
+            tr("profile.tab.data_dictionary"),
+        )
+    )
+    with column_tab:
+        _render_column_profile(column_profile, language)
+    with dictionary_tab:
+        _render_data_dictionary(dictionary, language)
+
+
 def render_export(filtered: pd.DataFrame, language: str) -> None:
     """Render export facts and download the current filtered schema."""
     st.subheader(f"{SECTION_ICONS['export']} {tr('export.title')}")
@@ -844,6 +1097,8 @@ def render_dashboard() -> None:
         render_overview(result)
     elif section == "findings":
         render_findings(result, enriched_findings)
+    elif section == "profile":
+        render_profile(result)
     elif section == "data":
         render_data(result, source_name)
     elif section == "export":

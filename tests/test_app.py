@@ -59,6 +59,24 @@ def app_with_uploaded_bytes(
     return app.run(timeout=10)
 
 
+def one_expense_csv(**updates: str) -> bytes:
+    """Return one schema-compatible expense row with optional explicit changes."""
+    row = {
+        "id_spesa": "100001",
+        "data_spesa": "13/07/2026",
+        "dipendente": "Cognome001 Nome001",
+        "centro_di_costo": "CDC-001",
+        "categoria": "Vitto",
+        "descrizione": "Pranzo di lavoro",
+        "importo": "25.00",
+        "valuta_originale": "EUR",
+        "progetto": "PRJ-2026-001",
+        "approvatore": "Cognome002 Nome002",
+    }
+    row.update(updates)
+    return pd.DataFrame([row], columns=EXPECTED_COLUMNS).to_csv(index=False).encode()
+
+
 def test_initial_state_offers_equal_starting_paths_and_main_copy() -> None:
     app = AppTest.from_file(ROOT / "app.py").run()
 
@@ -157,6 +175,7 @@ def test_example_source_keeps_confirmed_metrics_and_rule_count() -> None:
     assert navigation.options == [
         "▦ Panoramica",
         "⚑ Segnalazioni",
+        "◫ Profilo dati",
         "▤ Dati",
         "⇩ Esporta",
     ]
@@ -470,6 +489,153 @@ def test_data_and_export_sections_present_factual_context() -> None:
     assert any(button.label == "Scarica la vista corrente" for button in app.get("download_button"))
 
 
+def test_italian_profile_shows_tabs_metrics_tables_and_example_facts() -> None:
+    app = loaded_example_app()
+    app = app.get("button_group")[0].set_value("profile").run(timeout=10)
+
+    assert not app.exception
+    assert app.session_state["workspace_section"] == "profile"
+    assert [tab.label for tab in app.get("tab")] == [
+        "Profilo per colonna",
+        "Dizionario dati",
+    ]
+    assert [(metric.label, metric.value) for metric in app.metric] == [
+        ("Colonne sorgente", "10"),
+        ("Colonne canoniche", "10"),
+        ("Colonne aggiuntive", "0"),
+        ("Righe con segnalazioni", "37"),
+    ]
+    assert any(
+        caption.value
+        == (
+            "Righe sorgente: 300 · Segnalazioni totali: 43 · "
+            "Righe duplicate per ID: 6 · Righe duplicate logiche: 6 · "
+            "Segnalazioni di validità: 10"
+        )
+        for caption in app.caption
+    )
+    column_tab, dictionary_tab = app.get("tab")
+    column_profile = column_tab.get("dataframe")[0].value
+    dictionary = dictionary_tab.get("dataframe")[0].value
+    assert column_profile["technical_name"].tolist() == list(EXPECTED_COLUMNS)
+    assert column_profile["missing_values"].ge(0).all()
+    assert dictionary["technical_name"].tolist() == list(EXPECTED_COLUMNS)
+    assert dictionary.loc[0, "display_name"] == "ID spesa"
+    assert dictionary.loc[0, "description"] == ("Identificativo numerico progressivo della spesa.")
+    assert len(app.get("vega_lite_chart")) == 1
+
+
+def test_profile_language_change_preserves_stable_section_and_translates_dictionary() -> None:
+    app = loaded_example_app()
+    app = app.get("button_group")[0].set_value("profile").run(timeout=10)
+
+    app = app.sidebar.selectbox[0].set_value("English").run(timeout=10)
+
+    assert not app.exception
+    assert app.session_state["workspace_section"] == "profile"
+    assert app.get("button_group")[0].value == "profile"
+    assert [tab.label for tab in app.get("tab")] == [
+        "Column profile",
+        "Data dictionary",
+    ]
+    assert [(metric.label, metric.value) for metric in app.metric] == [
+        ("Source columns", "10"),
+        ("Canonical columns", "10"),
+        ("Extra columns", "0"),
+        ("Rows with findings", "37"),
+    ]
+    dictionary = app.get("tab")[1].get("dataframe")[0].value
+    assert dictionary.loc[0, "technical_name"] == "id_spesa"
+    assert dictionary.loc[0, "display_name"] == "Expense ID"
+    assert dictionary.loc[0, "description"] == ("Progressive numeric identifier of the expense.")
+
+
+def test_profile_distinguishes_extra_columns_without_changing_example_metrics() -> None:
+    source = pd.read_csv(EXAMPLE_PATH, dtype=str, keep_default_na=False)
+    source["extra_note"] = "source value"
+    app = app_with_uploaded_bytes(
+        "spese_con_extra.csv",
+        source.to_csv(index=False).encode(),
+    )
+
+    app = app.get("button_group")[0].set_value("profile").run(timeout=10)
+
+    assert not app.exception
+    assert [(metric.label, metric.value) for metric in app.metric] == [
+        ("Colonne sorgente", "11"),
+        ("Colonne canoniche", "10"),
+        ("Colonne aggiuntive", "1"),
+        ("Righe con segnalazioni", "37"),
+    ]
+    assert any(warning.value == "Colonna aggiuntiva: extra_note" for warning in app.warning)
+    column_profile = app.get("tab")[0].get("dataframe")[0].value
+    assert column_profile.iloc[-1]["technical_name"] == "extra_note"
+    assert column_profile.iloc[-1]["column_kind"] == "Aggiuntiva"
+
+
+@pytest.mark.parametrize(
+    ("updates", "expected_missing"),
+    [
+        ({}, 0),
+        ({"progetto": "   "}, 1),
+    ],
+)
+def test_profile_reports_column_missing_values_without_a_quality_score(
+    updates: dict[str, str],
+    expected_missing: int,
+) -> None:
+    app = app_with_uploaded_bytes("spesa.csv", one_expense_csv(**updates))
+    app = app.get("button_group")[0].set_value("profile").run(timeout=10)
+
+    assert not app.exception
+    profile = app.get("tab")[0].get("dataframe")[0].value.set_index("technical_name")
+    assert profile.loc["progetto", "missing_values"] == expected_missing
+    assert profile.loc["progetto", "completeness_percentage"] == (
+        100.0 if expected_missing == 0 else 0.0
+    )
+    visible_text = " ".join(
+        str(element.value)
+        for element_type in ("markdown", "caption", "subheader")
+        for element in app.get(element_type)
+    ).casefold()
+    assert "quality score" not in visible_text
+    assert "punteggio globale" not in visible_text
+
+
+def test_profile_handles_a_valid_dataset_without_findings() -> None:
+    rows = []
+    for offset in range(5):
+        rows.append(
+            {
+                "id_spesa": str(100001 + offset),
+                "data_spesa": f"{13 + offset:02d}/07/2026",
+                "dipendente": f"Cognome{offset + 1:03d} Nome{offset + 1:03d}",
+                "centro_di_costo": "CDC-001",
+                "categoria": "Vitto",
+                "descrizione": "Pranzo di lavoro",
+                "importo": f"{20 + offset}.00",
+                "valuta_originale": "EUR",
+                "progetto": "PRJ-2026-001",
+                "approvatore": "Cognome010 Nome010",
+            }
+        )
+    content = pd.DataFrame(rows, columns=EXPECTED_COLUMNS).to_csv(index=False).encode()
+
+    app = app_with_uploaded_bytes("spese_valide.csv", content)
+    app = app.get("button_group")[0].set_value("profile").run(timeout=10)
+
+    assert not app.exception
+    assert [(metric.label, metric.value) for metric in app.metric] == [
+        ("Colonne sorgente", "10"),
+        ("Colonne canoniche", "10"),
+        ("Colonne aggiuntive", "0"),
+        ("Righe con segnalazioni", "0"),
+    ]
+    assert any("Segnalazioni totali: 0" in caption.value for caption in app.caption)
+    profile = app.get("tab")[0].get("dataframe")[0].value
+    assert profile["related_findings"].eq(0).all()
+
+
 def test_english_initial_state_and_language_selector_use_explicit_copy() -> None:
     app = AppTest.from_file(ROOT / "app.py")
     app.session_state["language"] = "en"
@@ -511,6 +677,7 @@ def test_english_example_keeps_metrics_and_uses_stable_navigation_ids() -> None:
     assert navigation.options == [
         "▦ Overview",
         "⚑ Findings",
+        "◫ Data profile",
         "▤ Data",
         "⇩ Export",
     ]
@@ -630,6 +797,7 @@ def test_language_change_keeps_source_filters_and_stable_section() -> None:
     assert app.get("button_group")[0].options == [
         "▦ Overview",
         "⚑ Findings",
+        "◫ Data profile",
         "▤ Data",
         "⇩ Export",
     ]
