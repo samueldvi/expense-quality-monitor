@@ -329,7 +329,7 @@ def render_filter_controls(enriched_findings: pd.DataFrame) -> pd.DataFrame:
     st.text_input(
         "Cerca per ID, regola o descrizione",
         key="finding_search",
-        placeholder="ID spesa, rule ID o testo",
+        placeholder="ID spesa, ID regola o testo",
     )
     filter_columns = st.columns(4)
     with filter_columns[0]:
@@ -507,10 +507,13 @@ def render_dashboard() -> None:
     render_file_context(source_name, len(result.source_data))
     extra_columns = source_extra_columns(result.source_data)
     if extra_columns:
-        st.info(
-            f"Il file contiene {len(extra_columns)} colonne aggiuntive "
-            "che non vengono utilizzate nell’analisi."
+        extra_count = len(extra_columns)
+        extra_description = (
+            "colonna aggiuntiva che non viene utilizzata"
+            if extra_count == 1
+            else "colonne aggiuntive che non vengono utilizzate"
         )
+        st.info(f"Il file contiene {extra_count} {extra_description} nell’analisi.")
     st.session_state.setdefault("workspace_section", DEFAULT_SECTION)
     section = st.segmented_control(
         "Sezione",
