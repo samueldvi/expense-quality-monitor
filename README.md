@@ -109,7 +109,7 @@ python -m ruff check .
 python -m ruff format --check .
 ```
 
-La versione corrente dispone di 75 test automatici. GitHub Actions rigenera il dataset, verifica la ground truth ed esegue test, Ruff, Bandit e compilazione dei sorgenti. A parità di input e versione, la pipeline produce risultati deterministici.
+La versione corrente dispone di 77 test automatici. GitHub Actions rigenera il dataset, verifica la ground truth ed esegue test, Ruff, Bandit e compilazione dei sorgenti. A parità di input e versione, la pipeline produce risultati deterministici.
 
 ## Architettura
 
